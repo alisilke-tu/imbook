@@ -1,3 +1,10 @@
 {
-	"id": "krcmar-v3-qie2"
+	"id": "krcmar-v3-qie2",
+	"global_cors": {
+		"allow_origins_with_credentials": [
+			"http://localhost:5173",
+			"http://127.0.0.1:5173"
+		],
+		"allow_headers": ["Authorization", "Content-Type"]
+	}
 }

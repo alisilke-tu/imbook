@@ -6,9 +6,9 @@ import Client, { Environment, Local } from "./client.ts";
  * backend is also running locally.
  */
 const getRequestClient = (token: string | undefined) => {
-  const env = import.meta.env.DEV ? Local : Environment("staging");
+  const apiUrl = import.meta.env.VITE_API_URL || Local;
 
-  return new Client(env, {
+  return new Client(apiUrl, {
     auth: token,
   });
 };

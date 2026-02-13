@@ -1,6 +1,15 @@
 import React, { useContext, useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { Link, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import {
+  Box,
+  TextField,
+  Button,
+  Alert,
+  Paper,
+  Typography,
+  Link,
+} from "@mui/material";
 import { FirebaseContext } from "../lib/firebase.tsx";
 
 const Signup = () => {
@@ -29,57 +38,79 @@ const Signup = () => {
   };
 
   return (
-    <div className="center">
-      <div>
-        <form className="loginForm">
-          {notice && <div role="alert">{notice}</div>}
-          <div>
-            <label htmlFor="signupEmail">Enter an email address</label>
-            <input
-              id="signupEmail"
-              type="email"
-              aria-describedby="emailHelp"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="signupPassword">Password</label>
-            <input
-              id="signupPassword"
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-          <div>
-            <button
-              type="submit"
-              onClick={(e) => signupWithUsernameAndPassword(e)}
-            >
-              Signup
-            </button>
-          </div>
-          <div>
-            <span>
-              <Link to="/login">Already have an account?</Link>
-            </span>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Box
+      sx={{
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <Paper elevation={3} sx={{ p: 4, maxWidth: 500, width: "100%" }}>
+        <Box component="form" sx={{ display: "flex", flexDirection: "column" }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Sign Up
+          </Typography>
+
+          {notice && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {notice}
+            </Alert>
+          )}
+
+          <TextField
+            id="signupEmail"
+            type="email"
+            label="Enter an email address"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            fullWidth
+            margin="normal"
+            required
+          />
+
+          <TextField
+            id="signupPassword"
+            type="password"
+            label="Password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            fullWidth
+            margin="normal"
+            required
+          />
+
+          <TextField
+            id="confirmPassword"
+            type="password"
+            label="Confirm Password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            fullWidth
+            margin="normal"
+            required
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            onClick={(e) => signupWithUsernameAndPassword(e)}
+            sx={{ mt: 2, mb: 2 }}
+          >
+            Signup
+          </Button>
+
+          <Typography variant="body2" align="center">
+            <Link component={RouterLink} to="/login">
+              Already have an account?
+            </Link>
+          </Typography>
+        </Box>
+      </Paper>
+    </Box>
   );
 };
 

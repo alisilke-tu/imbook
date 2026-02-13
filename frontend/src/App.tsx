@@ -1,17 +1,21 @@
 import React, { PropsWithChildren, useContext, useEffect } from "react";
 import {
   createBrowserRouter,
-  Link,
+  Link as RouterLink,
   Outlet,
   RouterProvider,
   useNavigate,
   useRouteError,
 } from "react-router-dom";
 import { signOut } from "firebase/auth";
+import {
+  Box,
+  Container,
+  Typography,
+  Link,
+} from "@mui/material";
 import AdminDashboard from "./components/AdminDashboard.tsx";
-
 import IndexPage from "./components/IndexPage.tsx";
-import "./App.css";
 import Login from "./components/Login.tsx";
 import Signup from "./components/Signup.tsx";
 import { FirebaseContext, FirebaseProvider } from "./lib/firebase.tsx";
@@ -61,7 +65,7 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <FirebaseProvider>
-      <RouterProvider router={router} fallbackElement={<p>Loading...</p>} />
+      <RouterProvider router={router} fallbackElement={<Typography>Loading...</Typography>} />
     </FirebaseProvider>
   );
 }
@@ -82,32 +86,77 @@ function Layout({ children }: PropsWithChildren) {
   };
 
   return (
-    <div>
-      <header>
-        <nav className="nav">
-          <div className="navLinks">
-            <Link to="/">Home</Link>
-            <Link to="/admin-dashboard">Admin Dashboard</Link>
-          </div>
-
-          <div>
-            {!isLoading && (
-              <>
-                {user?.uid ? (
-                  <button onClick={logoutUser}>Logout</button>
-                ) : (
-                  <Link to="/login">
-                    <button>Login</button>
-                  </Link>
-                )}
-              </>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* Simple text navigation */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '80px',
+          display: { xs: 'none', md: 'flex' },
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          px: 8,
+          zIndex: 10,
+          gap: 3,
+        }}
+      >
+        {!isLoading && (
+          <>
+            {user?.uid ? (
+              <Link
+                component="button"
+                onClick={logoutUser}
+                sx={{
+                  color: 'black',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    opacity: 0.7,
+                  },
+                }}
+              >
+                Logout
+              </Link>
+            ) : (
+              <Link
+                component={RouterLink}
+                to="/login"
+                sx={{
+                  color: 'black',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  textDecoration: 'none',
+                  '&:hover': {
+                    opacity: 0.7,
+                  },
+                }}
+              >
+                Login
+              </Link>
             )}
-          </div>
-        </nav>
-      </header>
+          </>
+        )}
+      </Box>
 
-      <main className="main">{children ?? <Outlet />}</main>
-    </div>
+      <Container
+        component="main"
+        maxWidth={false}
+        sx={{
+          display: 'flex',
+          flexGrow: 1,
+          py: 0,
+        }}
+      >
+        {children ?? <Outlet />}
+      </Container>
+    </Box>
   );
 }
 
@@ -119,7 +168,7 @@ function ProtectedRoutes() {
     if (!isLoading && !auth?.currentUser?.uid) navigate("/login");
   }, [isLoading, auth]);
 
-  if (isLoading) return "Loading...";
+  if (isLoading) return <Typography>Loading...</Typography>;
 
   return <Outlet />;
 }
@@ -127,9 +176,13 @@ function ProtectedRoutes() {
 function ErrorBoundary() {
   const error = useRouteError() as Error;
   return (
-    <div>
-      <h1>Something went wrong</h1>
-      <p>{error.message || JSON.stringify(error)}</p>
-    </div>
+    <Container sx={{ py: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Something went wrong
+      </Typography>
+      <Typography variant="body1">
+        {error.message || JSON.stringify(error)}
+      </Typography>
+    </Container>
   );
 }

@@ -12,6 +12,10 @@
     "gen:local": "encore gen client krcmar-v3-qie2 --output=./src/lib/client.ts --env=local"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.8",
+    "@mui/material": "^7.3.8",
     "firebase": "^10.8.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
