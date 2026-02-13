@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "encore-mcp": {
+            "args": [
+                "mcp",
+                "run",
+                "--app=krcmar-v3-qie2"
+            ],
+            "command": "encore"
+        }
+    }
+}

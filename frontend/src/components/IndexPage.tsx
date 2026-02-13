@@ -3,7 +3,7 @@ import "./IndexPage.css";
 function IndexPage() {
   return (
     <div className="IndexPage">
-      <h1>React + Encore Web App Starter</h1>
+      <h1>My Webapp + Encore Web App Starter</h1>
 
       <div className="grid">
         <a href="https://encore.dev/docs" className="card" target="_blank">
