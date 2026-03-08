@@ -1,146 +1,397 @@
-# Firebase Auth + Encore App Example
+# IMBook
 
-This is an example of how to do user authentication using [Firebase Auth](https://firebase.google.com/docs/auth) together with an Encore app.
-Check out the [Use Firebase with your app](https://encore.dev/docs/go/how-to/firebase-auth) guide to learn more about this example.
+A form submission application built with Encore.go backend and React frontend, featuring Firebase authentication and role-based access control.
 
-## Cloning the example
+## Table of Contents
 
-When you have [installed Encore](https://encore.dev/docs/go/install), you can create a new Encore application and clone
-this example by running this command:
+- [Codebase Overview](#codebase-overview)
+- [Tech Stack](#tech-stack)
+- [Services](#services)
+- [Getting Started](#getting-started)
+- [Using Encore](#using-encore)
+- [Development](#development)
+- [Deployment](#deployment)
 
+## Codebase Overview
+
+This application consists of:
+
+### Backend (`backend/`)
+- **Go services** built with Encore.dev framework
+- **PostgreSQL database** for storing form submissions
+- **Firebase Auth integration** for user authentication
+- **RESTful APIs** with automatic type-safe client generation
+
+### Frontend (`frontend/`)
+- **React + TypeScript** application
+- **Material-UI** components for the user interface
+- **Firebase Auth** for user authentication
+- **Vite** as the build tool and dev server
+- **React Router** for client-side routing
+
+### Key Features
+- Public form submission endpoint (no authentication required)
+- Protected admin dashboard (authentication required)
+- Protected submissions listing endpoint (authentication required)
+- Role-based form submissions with validation
+- Email validation and optional email collection
+
+## Tech Stack
+
+### Backend
+- **Go 1.24** - Programming language
+- **Encore.dev** - Backend framework providing:
+  - Automatic API generation and type-safe clients
+  - Built-in PostgreSQL database management
+  - Distributed tracing and observability
+  - Infrastructure provisioning
+  - Authentication middleware
+- **Firebase Admin SDK** - For token verification and user management
+- **PostgreSQL** - Relational database (managed by Encore)
+
+### Frontend
+- **React 18** - UI library
+- **TypeScript** - Type-safe JavaScript
+- **Vite** - Build tool and dev server
+- **Material-UI (MUI)** - Component library
+- **Firebase Auth** - Client-side authentication
+- **React Router** - Client-side routing
+
+## Services
+
+The application consists of three Encore services:
+
+### 1. `auth` Service
+**Location:** `backend/auth/auth.go`
+
+Handles user authentication using Firebase Auth.
+
+- **`ValidateToken`** - Encore auth handler that verifies Firebase ID tokens
+- Validates tokens against Firebase Auth
+- Extracts user data (email, name, picture) from token claims
+- Returns user ID and user data for use in authenticated endpoints
+
+**Configuration:**
+- Requires `FirebasePrivateKey` secret (Firebase service account JSON)
+
+### 2. `submissions` Service
+**Location:** `backend/submissions/submissions.go`
+
+Manages form submissions with a PostgreSQL database.
+
+**Endpoints:**
+- **`POST /submissions/submit`** (public)
+  - Accepts form submissions from anonymous users
+  - Validates question, role, and optional email
+  - Stores submissions in database
+  - Validates roles against allowed list (CIO, CTO, CEO, CFO, COO, director, manager, analyst, consultant, etc.)
+
+- **`GET /submissions`** (auth required)
+  - Returns all submissions ordered by submission date
+  - Requires valid Firebase authentication token
+  - Returns list of submissions with ID, question, role, email, and timestamp
+
+**Database Schema:**
+```sql
+CREATE TABLE submissions (
+  id BIGSERIAL PRIMARY KEY,
+  question TEXT NOT NULL,
+  role TEXT NOT NULL,
+  email TEXT NOT NULL,
+  submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Valid Roles:**
+- `cio`, `cto`, `ceo`, `cfo`, `coo`, `other-c-level`
+- `director`, `manager`, `analyst`, `consultant`, `other`
+
+### 3. `admin` Service
+**Location:** `backend/admin/admin.go`
+
+Provides admin dashboard functionality.
+
+**Endpoints:**
+- **`GET /admin`** (auth required)
+  - Returns admin dashboard data
+  - Requires valid Firebase authentication token
+  - Logs user information for audit purposes
+
+## Getting Started
+
+### Prerequisites
+
+- [Go 1.24+](https://go.dev/dl/)
+- [Encore CLI](https://encore.dev/docs/go/install)
+- [Node.js 18+](https://nodejs.org/)
+- [Firebase account](https://firebase.google.com/)
+- [PostgreSQL](https://www.postgresql.org/) (managed by Encore in cloud, local for development)
+
+### Backend Setup
+
+1. **Install Encore CLI:**
+   ```bash
+   curl -L https://encore.dev/install.sh | bash
+   ```
+
+2. **Set up Firebase credentials:**
+   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+   - Go to **Project Settings** → **Service Accounts**
+   - Select **Go** and click **Generate new private key**
+   - Download the JSON key file
+
+3. **Configure Encore secrets:**
+   ```bash
+   # For production
+   encore secret set --type prod FirebasePrivateKey < /path/to/firebase-private-key.json
+   
+   # For development/local
+   encore secret set --type dev,local FirebasePrivateKey < /path/to/firebase-private-key.json
+   ```
+
+4. **Run the backend:**
+   ```bash
+   encore run
+   ```
+   
+   The backend will be available at `http://localhost:4000`
+   Encore dashboard: `http://localhost:9400`
+
+### Frontend Setup
+
+1. **Install dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+2. **Configure Firebase:**
+   - In Firebase Console, go to **Project Settings** → **General**
+   - Click the **</>** icon to add a web app
+   - Copy the Firebase config object
+   - Update `frontend/.env` with your Firebase config:
+     ```env
+     VITE_FIREBASE_API_KEY=your-api-key
+     VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+     VITE_FIREBASE_PROJECT_ID=your-project-id
+     VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+     VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+     VITE_FIREBASE_APP_ID=your-app-id
+     ```
+
+3. **Generate Encore API client:**
+   ```bash
+   # For local development
+   npm run gen:local
+   
+   # For staging/production
+   npm run gen
+   ```
+
+4. **Run the frontend:**
+   ```bash
+   npm run dev
+   ```
+   
+   The frontend will be available at `http://localhost:5173`
+
+## Using Encore
+
+### Encore CLI Commands
+
+**Running the application:**
 ```bash
-encore app create my-app --example=firebase-auth
+encore run              # Start local development server
+encore run --debug      # Start with debug logging
+encore run --watch=true # Auto-reload on file changes
 ```
 
-## Firebase Backend Credentials
-
-Create a Firebase account if you haven't already. Then, create a new Firebase Project.
-
-Then, go to **Project settings** and navigate to **Service accounts**.
-Select `Go` as the language of choice and click `Generate new private key`.
-Download the generated key and take note where it is stored.
-
-Next, store the private key as your firebase secret.
-From your terminal (inside your Encore app directory), run:
-
-```shell
-$ encore secret set --type prod FirebasePrivateKey < /path/to/firebase-private-key.json
-Successfully updated production secret FirebasePrivateKey
-```
-
-Now you should do the same for the development secret. The most secure way is to
-set up a different Firebase project and use that for development.
-
-Depending on your security requirements you could also use the same Firebase project,
-but we recommend generating a new private key for development in that case.
-
-Once you have a private key for development, set it similarly to before:
-
-```shell
-$ encore secret set --type dev,local,pr FirebasePrivateKey < /path/to/firebase-private-key.json
-Successfully updated development secret FirebasePrivateKey
-```
-
-## Firebase Frontend Credentials
-
-On your Firebase Projects overview page, click on the circular button with the </> icon to configure your Firebase 
-project for a web application. At the end of the flow you will be given a config object that looks like this:
-
-```ts
-const firebaseConfig = {
-  apiKey: "AIzaSyDiUlY68W9Li_0EIkmdGdzD7nvqCT9kHnY",
-  authDomain: "my-auth-test-fbd48.firebaseapp.com",
-  projectId: "my-auth-test-fbd48",
-  storageBucket: "my-auth-test-fbd48.appspot.com",
-  messagingSenderId: "1078604952662",
-  appId: "1:1078604952662:web:5d0b908439cfb5684ab7f7"
-};
-```
-
-Replace the corresponding values in the `frontend/.env` file. 
-
-## Developing locally
-
-Run your Encore backend:
-
+**Testing:**
 ```bash
-encore run
+encore test ./...       # Run all tests
+encore check            # Check for compile-time errors
 ```
 
-In a different terminal window, run the React frontend using [Vite](https://vitejs.dev/):
-
+**Database management:**
 ```bash
-cd frontend
-npm install
-npm run dev
+encore db shell submissions              # Open psql shell for submissions DB
+encore db conn-uri submissions           # Get connection string
+encore db proxy                          # Set up local connection proxy
+encore db reset                          # Reset all databases
+encore db reset submissions              # Reset specific database
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser to see the result.
-
-### Encore's Local Development Dashboard
-
-While `encore run` is running, open [http://localhost:9400/](http://localhost:9400/) to view Encore's local developer dashboard.
-Here you can see the request you just made and a view a trace of the response.
-
-### Generating a request client
-
-Keep the contract between the backend and frontend in sync by regenerating the request client whenever you make a change
-to an Encore endpoint.
-
+**Secrets management:**
 ```bash
-npm run gen # Deployed Encore staging environment
-# or
-npm run gen:local # Locally running Encore backend
+encore secret list                       # List all secrets
+encore secret set --type dev SecretName  # Set development secret
+encore secret set --type prod SecretName # Set production secret
 ```
+
+**Code generation:**
+```bash
+encore gen client krcmar-v3-qie2 --lang=typescript --output=./client.ts
+```
+
+**Logging:**
+```bash
+encore logs                    # Stream logs from local
+encore logs --env=prod         # Stream logs from production
+encore logs --json             # JSON formatted logs
+```
+
+**App management:**
+```bash
+encore app link [app-id]       # Link local app to Encore cloud
+encore auth login              # Authenticate with Encore
+encore auth whoami             # Show current user
+```
+
+### Encore Features Used
+
+1. **Type-safe APIs:**
+   - APIs are defined with `//encore:api` annotations
+   - Automatic OpenAPI/Swagger generation
+   - Type-safe client generation for frontend
+
+2. **Database Migrations:**
+   - Migrations in `backend/submissions/migrations/`
+   - Automatic migration execution on deployment
+   - Version-controlled schema changes
+
+3. **Authentication:**
+   - Custom auth handler in `auth` service
+   - `auth` access control for protected endpoints
+   - User data available via `auth.Data()` in handlers
+
+4. **CORS Configuration:**
+   - Configured in `encore.app`
+   - Supports credentials for authenticated requests
+   - Allows localhost and production domains
+
+5. **Error Handling:**
+   - Uses `encore.dev/beta/errs` for structured errors
+   - Automatic HTTP status code mapping
+   - Error metadata and tracing
+
+### Encore Dashboard
+
+When running `encore run`, access the dashboard at `http://localhost:9400`:
+- **API Explorer** - Test endpoints interactively
+- **Traces** - View request traces and performance
+- **Metrics** - Monitor API usage and errors
+- **Database** - Browse database schema and data
+- **Logs** - View application logs
+
+## Development
+
+### Project Structure
+
+```
+.
+├── backend/
+│   ├── admin/              # Admin service
+│   │   └── admin.go
+│   ├── auth/               # Authentication service
+│   │   └── auth.go
+│   └── submissions/        # Submissions service
+│       ├── submissions.go
+│       └── migrations/      # Database migrations
+│           └── 1_create_submissions.up.sql
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── lib/            # Utilities and client
+│   │   └── App.tsx         # Main app component
+│   └── package.json
+├── encore.app              # Encore configuration
+└── go.mod                  # Go dependencies
+```
+
+### API Endpoints
+
+**Public Endpoints:**
+- `POST /submissions/submit` - Submit a form
+
+**Authenticated Endpoints:**
+- `GET /submissions` - List all submissions
+- `GET /admin` - Get admin dashboard data
+
+### Environment Variables
+
+**Frontend (.env):**
+- `VITE_FIREBASE_*` - Firebase configuration
+
+**Backend (Encore secrets):**
+- `FirebasePrivateKey` - Firebase service account JSON
 
 ## Deployment
 
-### Encore
+### Backend Deployment
 
-Deploy your backend to a staging environment in Encore's free development cloud:
+Deploy to Encore Cloud:
 
 ```bash
 git add -A .
-git commit -m 'Commit message'
+git commit -m 'Your commit message'
 git push encore
 ```
 
-Then head over to the [Cloud Dashboard](https://app.encore.dev) to monitor your deployment and find your production URL.
+Encore automatically:
+- Builds and deploys your backend
+- Runs database migrations
+- Provisions infrastructure
+- Sets up monitoring and logging
 
-From there you can also see metrics, traces, connect your app to a
-GitHub repo to get automatic deploys on new commits, and connect your own AWS or GCP account to use for deployment.
+Access your deployment:
+- Dashboard: https://app.encore.dev
+- API Base URL: Provided in dashboard
 
-### React on Vercel
+### Frontend Deployment
 
-1. Create a repo and push the project to GitHub.
-2. Create a new project on Vercel and point it to your GitHup repo.
-3. Select `frontend` as the root directory for the Vercel project.
+Deploy to Vercel (or any static host):
 
-## CORS configuration
+1. **Build the frontend:**
+   ```bash
+   cd frontend
+   npm run build
+   ```
 
-If you are running into CORS issues when calling your Encore API from your frontend then you may need to specify which
-origins are allowed to access your API (via browsers). You do this by specifying the `global_cors` key in the `encore.app`
-file, which has the following structure:
+2. **Deploy to Vercel:**
+   - Connect your GitHub repository
+   - Set root directory to `frontend`
+   - Configure environment variables
+   - Deploy
 
-```js
-global_cors: {
-  // allow_origins_without_credentials specifies the allowed origins for requests
-  // that don't include credentials. If nil it defaults to allowing all domains
-  // (equivalent to ["*"]).
-  "allow_origins_without_credentials": [
-    "<ORIGIN-GOES-HERE>"
-  ],
-        
-  // allow_origins_with_credentials specifies the allowed origins for requests
-  // that include credentials. If a request is made from an Origin in this list
-  // Encore responds with Access-Control-Allow-Origin: <Origin>.
-  //
-  // The URLs in this list may include wildcards (e.g. "https://*.example.com"
-  // or "https://*-myapp.example.com").
-  "allow_origins_with_credentials": [
-    "<DOMAIN-GOES-HERE>"
-  ]
-}
+3. **Update CORS in `encore.app`:**
+   Add your frontend domain to `allow_origins_with_credentials`:
+   ```json
+   {
+     "global_cors": {
+       "allow_origins_with_credentials": [
+         "https://your-frontend-domain.vercel.app"
+       ]
+     }
+   }
+   ```
+
+### Environment-Specific Configuration
+
+- **Local:** Uses local Encore daemon and local database
+- **Development:** Uses Encore dev environment
+- **Staging:** Uses Encore staging environment
+- **Production:** Uses Encore production environment
+
+Configure secrets per environment:
+```bash
+encore secret set --type prod FirebasePrivateKey < key.json
+encore secret set --type dev FirebasePrivateKey < key.json
 ```
 
-More information on CORS configuration can be found here: https://encore.dev/docs/go/develop/cors
+## Additional Resources
+
+- [Encore Documentation](https://encore.dev/docs)
+- [Encore Go Guide](https://encore.dev/docs/go)
+- [Firebase Auth Documentation](https://firebase.google.com/docs/auth)
+- [Material-UI Documentation](https://mui.com/)
+- [React Router Documentation](https://reactrouter.com/)
