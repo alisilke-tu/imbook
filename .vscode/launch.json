@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug xmlread",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/backend/cmd/xmlread",
+      "args": ["/Users/kronos/Documents/Studium/Master/Masterarbeit/Krcmar2015_Informationsmanagement_Content.xml"]
+    }
+  ]
+}

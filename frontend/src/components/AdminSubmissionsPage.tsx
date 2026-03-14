@@ -1,82 +1,77 @@
 import { useContext, useEffect, useState } from "react";
 import {
-  Container,
-  Paper,
-  Typography,
-  CircularProgress,
+  Alert,
   Box,
+  CircularProgress,
+  Paper,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Alert,
+  Typography,
 } from "@mui/material";
 import getRequestClient from "../lib/getRequestClient.ts";
 import { submissions } from "../lib/client.ts";
 import { FirebaseContext } from "../lib/firebase.tsx";
 
-function AdminDashboard() {
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatRole(role: string) {
+  const roleMap: Record<string, string> = {
+    cio: "CIO",
+    cto: "CTO",
+    ceo: "CEO",
+    cfo: "CFO",
+    coo: "COO",
+    "other-c-level": "Other C-Level",
+    director: "Director",
+    manager: "Manager",
+    analyst: "Analyst",
+    consultant: "Consultant",
+    other: "Other",
+  };
+  return roleMap[role] ?? role;
+}
+
+export default function AdminSubmissionsPage() {
   const { auth } = useContext(FirebaseContext);
   const [submissionsData, setSubmissionsData] = useState<submissions.Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch submissions if user is authenticated
   useEffect(() => {
     const getSubmissions = async () => {
       try {
         const token = await auth?.currentUser?.getIdToken();
         const client = getRequestClient(token ?? undefined);
         const response = await client.submissions.List();
-        setSubmissionsData(response.submissions || []);
+        setSubmissionsData(response.submissions ?? []);
         setError(null);
-      } catch (err: any) {
-        setError(err.message || "Failed to load submissions");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load submissions");
       } finally {
         setLoading(false);
       }
     };
-    if (auth?.currentUser?.uid) getSubmissions();
+    if (auth?.currentUser?.uid) {
+      getSubmissions();
+    }
   }, [auth?.currentUser?.uid]);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const formatRole = (role: string) => {
-    const roleMap: { [key: string]: string } = {
-      cio: "CIO",
-      cto: "CTO",
-      ceo: "CEO",
-      cfo: "CFO",
-      coo: "COO",
-      "other-c-level": "Other C-Level",
-      director: "Director",
-      manager: "Manager",
-      analyst: "Analyst",
-      consultant: "Consultant",
-      other: "Other",
-    };
-    return roleMap[role] || role;
-  };
-
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Admin Dashboard
-      </Typography>
-
+    <>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        View all form submissions from users
+        View all form submissions from users.
       </Typography>
 
       {error && (
@@ -85,7 +80,7 @@ function AdminDashboard() {
         </Alert>
       )}
 
-      <Paper elevation={2} sx={{ mt: 3 }}>
+      <Paper elevation={2}>
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
             <CircularProgress />
@@ -139,8 +134,6 @@ function AdminDashboard() {
           </TableContainer>
         )}
       </Paper>
-    </Container>
+    </>
   );
 }
-
-export default AdminDashboard;
