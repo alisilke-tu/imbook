@@ -334,7 +334,6 @@ export default function AdminChunkingPage() {
         </Box>
         {(() => {
           const allChunks = Object.entries(chunksByParagraphId).flatMap(([, chunks]) => chunks);
-          const unembeddedChunks = allChunks.filter((c) => !c.embedded);
           const totalChars = allChunks.reduce((sum, c) => sum + c.text.length, 0);
           const selectedUnembeddedChars = Object.entries(chunksByParagraphId).reduce(
             (sum, [paraId, chunks]) =>
