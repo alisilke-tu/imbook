@@ -19,6 +19,7 @@ import AdminLayout from "./components/AdminLayout.tsx";
 import AdminSubmissionsPage from "./components/AdminSubmissionsPage.tsx";
 import AdminETLPipelinePage from "./components/AdminETLPipelinePage.tsx";
 import AdminSettingsPage from "./components/AdminSettingsPage.tsx";
+import AdminRoadmapPage from "./components/AdminRoadmapPage.tsx";
 import IndexPage from "./components/IndexPage.tsx";
 import Login from "./components/Login.tsx";
 import Signup from "./components/Signup.tsx";
@@ -61,6 +62,7 @@ const router = createBrowserRouter([
                   { index: true, element: <Navigate to="submissions" replace /> },
                   { path: "submissions", Component: AdminSubmissionsPage },
                   { path: "etl-pipeline", Component: AdminETLPipelinePage },
+                  { path: "roadmap", Component: AdminRoadmapPage },
                   { path: "settings", Component: AdminSettingsPage },
                 ],
               },

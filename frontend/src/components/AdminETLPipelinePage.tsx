@@ -12,7 +12,7 @@ export default function AdminETLPipelinePage() {
   return (
     <Box>
       <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2 }}>
-        ETL-Pipeline Seeding IM Buch
+        ETL-Pipeline
       </Typography>
       <Tabs value={tab} onChange={(_, v: TabId) => setTab(v)} sx={{ mb: 3 }}>
         <Tab label="Chapters & reference graph" value="chapters" />
