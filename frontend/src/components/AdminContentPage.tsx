@@ -6,6 +6,7 @@ import {
   Paper,
   Typography,
 } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -237,9 +238,37 @@ export default function AdminContentPage() {
 
   return (
     <>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
         Import XML content, browse chapters, and view the reference graph.
       </Typography>
+
+      <Alert
+        severity="info"
+        icon={<InfoOutlinedIcon />}
+        sx={{ mb: 3 }}
+      >
+        <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+          PDF → XML conversion (run locally)
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          To convert the book PDF into the XML that you upload here, run the following command on your machine.
+          We use Poppler (pdftohtml); this step is not hosted server-side yet, so it has to be done on the client for now.
+        </Typography>
+        <Box
+          component="code"
+          sx={{
+            display: "block",
+            fontFamily: "monospace",
+            fontSize: "0.85rem",
+            p: 1.5,
+            bgcolor: "action.hover",
+            borderRadius: 1,
+            overflow: "auto",
+          }}
+        >
+          pdftohtml -xml -f 26 -l 781 Krcmar2015_Informationsmanagement.pdf Krcmar2015_Informationsmanagement_Content
+        </Box>
+      </Alert>
 
       {/* Content import */}
       <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
