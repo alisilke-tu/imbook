@@ -2,7 +2,9 @@ package settings
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -31,7 +33,7 @@ func Get(ctx context.Context) (*GetResponse, error) {
 	var key string
 	err := db.QueryRow(ctx, `SELECT gemini_api_key FROM user_settings WHERE user_id = $1`, string(uid)).Scan(&key)
 	if err != nil {
-		if err == sqldb.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return &GetResponse{GeminiAPIKeySet: false}, nil
 		}
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to fetch settings"}
@@ -83,7 +85,7 @@ func GetGeminiKey(ctx context.Context, params *GetGeminiKeyParams) (*GetGeminiKe
 	var key string
 	err := db.QueryRow(ctx, `SELECT gemini_api_key FROM user_settings WHERE user_id = $1`, params.UserID).Scan(&key)
 	if err != nil {
-		if err == sqldb.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "OpenRouter API key not set. Set it in Settings."}
 		}
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to fetch API key"}
@@ -108,11 +110,14 @@ func Billing(ctx context.Context) (*BillingResponse, error) {
 	uid, _ := auth.UserID()
 	var key string
 	err := db.QueryRow(ctx, `SELECT gemini_api_key FROM user_settings WHERE user_id = $1`, string(uid)).Scan(&key)
-	if err != nil || key == "" {
-		if err == sqldb.ErrNoRows || key == "" {
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "OpenRouter API key not set. Set it above to view billing."}
 		}
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to fetch API key"}
+	}
+	if key == "" {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "OpenRouter API key not set. Set it above to view billing."}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, openRouterCreditsURL, nil)
 	if err != nil {

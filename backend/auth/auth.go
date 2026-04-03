@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -81,7 +83,7 @@ func ValidateToken(ctx context.Context, token string) (auth.UID, *UserData, erro
 
 	if err != nil {
 		// If user doesn't exist in database, auto-create them (bootstrap admin by email when applicable)
-		if err == sqldb.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			insertAdmin := isEmailBootstrapAdmin(ctx, email)
 			_, insertErr := usersDB.Exec(ctx, `
 				INSERT INTO users (firebase_uid, email, display_name, is_admin, last_login)
@@ -395,7 +397,7 @@ func UpdateUserRole(ctx context.Context, uid string, params *UpdateUserRoleParam
 		RETURNING firebase_uid, email, display_name, is_admin, last_login, created_at
 	`, params.IsAdmin, uid).Scan(&u.FirebaseUID, &u.Email, &u.DisplayName, &u.IsAdmin, &u.LastLogin, &u.CreatedAt)
 	if err != nil {
-		if err == sqldb.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
 		}
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to update user role"}
