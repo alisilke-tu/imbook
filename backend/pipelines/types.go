@@ -107,18 +107,19 @@ type PipelineEdge struct {
 
 // PipelineExecution represents a workflow execution
 type PipelineExecution struct {
-	ID              string           `json:"id"`
-	PipelineID      string           `json:"pipeline_id"`
-	UserID          string           `json:"user_id"`
-	Query           string           `json:"query"`
-	FinalOutput     *string          `json:"final_output,omitempty"`
-	AgentReplies    []AgentReply     `json:"agent_replies,omitempty"`
-	Trace           []ExecutionStep  `json:"trace,omitempty"`
-	ExecutionPath   []string         `json:"execution_path"`
-	TotalDurationMs int              `json:"total_duration_ms"`
-	Success         bool             `json:"success"`
-	ErrorMessage    *string          `json:"error_message,omitempty"`
-	CreatedAt       time.Time        `json:"created_at"`
+	ID                 string           `json:"id"`
+	PipelineID         string           `json:"pipeline_id"`
+	UserID             string           `json:"user_id"`
+	Query              string           `json:"query"`
+	FinalOutput        *string          `json:"final_output,omitempty"`
+	AgentReplies       []AgentReply     `json:"agent_replies,omitempty"`
+	Trace              []ExecutionStep  `json:"trace,omitempty"`
+	ExecutionPath      []string         `json:"execution_path"`
+	TotalDurationMs    int              `json:"total_duration_ms"`
+	Success            bool             `json:"success"`
+	ErrorMessage       *string          `json:"error_message,omitempty"`
+	CreatedAt          time.Time        `json:"created_at"`
+	LearningSessionID  *string          `json:"learning_session_id,omitempty"`
 }
 
 // ConditionType defines supported condition types

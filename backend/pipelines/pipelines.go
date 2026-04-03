@@ -696,11 +696,12 @@ func DeletePipeline(ctx context.Context, id string) error {
 
 // ExecutePipelineParams for executing a pipeline
 type ExecutePipelineParams struct {
-	Query string `json:"query"`
+	Query               string  `json:"query"`
+	LearningSessionID   *string `json:"learning_session_id,omitempty"`
 }
 
 // LoadPipelineExecutor builds a pipeline executor after validating the workflow exists, is enabled, and agent configs load.
-func LoadPipelineExecutor(ctx context.Context, pipelineID string, userID string, apiKey string) (*PipelineExecutor, error) {
+func LoadPipelineExecutor(ctx context.Context, pipelineID string, userID string, apiKey string, learningSessionID *string) (*PipelineExecutor, error) {
 	detail, err := GetPipeline(ctx, pipelineID)
 	if err != nil {
 		return nil, err
@@ -721,7 +722,7 @@ func LoadPipelineExecutor(ctx context.Context, pipelineID string, userID string,
 		}
 	}
 
-	return NewPipelineExecutor(&detail.Pipeline, detail.Nodes, detail.Edges, configs, userID, apiKey), nil
+	return NewPipelineExecutor(&detail.Pipeline, detail.Nodes, detail.Edges, configs, userID, apiKey, learningSessionID), nil
 }
 
 // GetFirstPipelineIDForUser returns one workflow id the user may run in chat (same visibility as ListPipelines).
@@ -748,13 +749,21 @@ func GetFirstPipelineIDForUser(ctx context.Context) (string, error) {
 //encore:api auth method=POST path=/pipelines/workflows/:id/execute
 func ExecutePipeline(ctx context.Context, id string, params *ExecutePipelineParams) (*PipelineExecution, error) {
 	uid, _ := auth.UserID()
+	if params == nil || params.Query == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "query is required"}
+	}
 
 	apiKey, err := getAPIKey(ctx, string(uid))
 	if err != nil {
 		return nil, err
 	}
 
-	executor, err := LoadPipelineExecutor(ctx, id, string(uid), apiKey)
+	var lsID *string
+	if params != nil && params.LearningSessionID != nil && *params.LearningSessionID != "" {
+		lsID = params.LearningSessionID
+	}
+
+	executor, err := LoadPipelineExecutor(ctx, id, string(uid), apiKey, lsID)
 	if err != nil {
 		return nil, err
 	}
@@ -804,10 +813,15 @@ func saveExecution(ctx context.Context, execution *PipelineExecution) error {
 		trace = b
 	}
 
+	var lsID interface{}
+	if execution.LearningSessionID != nil && *execution.LearningSessionID != "" {
+		lsID = *execution.LearningSessionID
+	}
+
 	_, err := pipelineDB.Exec(ctx, `
-		INSERT INTO pipeline_executions (pipeline_id, user_id, query, final_output, execution_path, total_duration_ms, success, error_message, agent_replies, trace)
-		VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::jsonb, $10::jsonb)
-	`, execution.PipelineID, execution.UserID, execution.Query, execution.FinalOutput, pathJSON, execution.TotalDurationMs, execution.Success, execution.ErrorMessage, agentReplies, trace)
+		INSERT INTO pipeline_executions (pipeline_id, user_id, query, final_output, execution_path, total_duration_ms, success, error_message, agent_replies, trace, learning_session_id)
+		VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9::jsonb, $10::jsonb, $11)
+	`, execution.PipelineID, execution.UserID, execution.Query, execution.FinalOutput, pathJSON, execution.TotalDurationMs, execution.Success, execution.ErrorMessage, agentReplies, trace, lsID)
 
 	return err
 }

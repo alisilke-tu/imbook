@@ -224,15 +224,7 @@ export default function AdminDatasetsPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Box>
-          <Typography variant="h4" component="h1" sx={{ fontSize: "2rem", fontWeight: 700, mb: 1 }}>
-            Embedding Datasets
-          </Typography>
-          <Typography sx={{ fontSize: "1.0625rem", color: "#666666" }}>
-            Manage versioned embedding datasets for knowledge retrieval tools.
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 4, display: "flex", justifyContent: "flex-end" }}>
         <Button variant="contained" onClick={() => setCreateDialogOpen(true)}>
           Create Dataset
         </Button>

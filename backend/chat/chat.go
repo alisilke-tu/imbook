@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"encore.app/backend/content"
+	"encore.app/backend/learning"
 	"encore.app/backend/pipelines"
 	"encore.app/backend/settings"
 	"encore.dev/beta/auth"
@@ -302,8 +304,9 @@ func ChatStream(w http.ResponseWriter, req *http.Request) {
 
 // ChatPipelineParams for pipeline-powered chat
 type ChatPipelineParams struct {
-	Message    string `json:"message"`
-	PipelineID string `json:"pipeline_id"` // Optional; uses first available workflow if empty
+	Message             string  `json:"message"`
+	PipelineID          string  `json:"pipeline_id"` // Optional; uses first available workflow if empty
+	LearningSessionID   *string `json:"learning_session_id,omitempty"`
 }
 
 // ChatPipelineResponse includes execution metadata
@@ -332,7 +335,11 @@ func ChatWithPipeline(ctx context.Context, params *ChatPipelineParams) (*ChatPip
 		}
 	}
 
-	execResult, err := pipelines.ExecutePipeline(ctx, pipelineID, &pipelines.ExecutePipelineParams{Query: params.Message})
+	lsID := resolveLearningSessionID(ctx, params.LearningSessionID)
+	execResult, err := pipelines.ExecutePipeline(ctx, pipelineID, &pipelines.ExecutePipelineParams{
+		Query:             params.Message,
+		LearningSessionID: lsID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +406,8 @@ func StreamPipeline(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	executor, err := pipelines.LoadPipelineExecutor(ctx, pipelineID, string(uid), apiKeyResp.Key)
+	lsID := resolveLearningSessionID(ctx, params.LearningSessionID)
+	executor, err := pipelines.LoadPipelineExecutor(ctx, pipelineID, string(uid), apiKeyResp.Key, lsID)
 	if err != nil {
 		code := http.StatusInternalServerError
 		switch errs.Code(err) {
@@ -465,4 +473,17 @@ func (s *sseWriter) WriteEvent(eventType string, data any) {
 	jsonData, _ := json.Marshal(data)
 	fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", eventType, jsonData)
 	s.flusher.Flush()
+}
+
+// resolveLearningSessionID uses an explicit id from the client, or the user's active learning session.
+func resolveLearningSessionID(ctx context.Context, explicit *string) *string {
+	if explicit != nil && strings.TrimSpace(*explicit) != "" {
+		return explicit
+	}
+	sess, err := learning.GetActiveLearningSession(ctx)
+	if err != nil {
+		return nil
+	}
+	id := sess.ID
+	return &id
 }

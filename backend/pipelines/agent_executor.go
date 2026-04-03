@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"encore.app/backend/content"
+	"encore.app/backend/learning"
 	"encore.dev/rlog"
 	"github.com/tmc/langchaingo/agents"
 	"github.com/tmc/langchaingo/callbacks"
@@ -149,7 +150,7 @@ func (e *AgentExecutor) createTools() ([]tools.Tool, error) {
 	var toolsList []tools.Tool
 
 	// Use ToolConfigs if available (new format)
-	if len(e.config.ToolConfigs) > 0 {
+		if len(e.config.ToolConfigs) > 0 {
 		for _, tc := range e.config.ToolConfigs {
 			switch tc.Name {
 			case "search_chunks":
@@ -162,6 +163,8 @@ func (e *AgentExecutor) createTools() ([]tools.Tool, error) {
 					datasetID: tc.DatasetID,
 					executor:  e,
 				})
+			case "get_learning_context":
+				toolsList = append(toolsList, &learningContextTool{userID: e.userID})
 			default:
 				rlog.Warn("unknown tool in config", "tool", tc.Name)
 			}
@@ -178,6 +181,8 @@ func (e *AgentExecutor) createTools() ([]tools.Tool, error) {
 					datasetID: "", // Will cause error when called
 					executor:  e,
 				})
+			case "get_learning_context":
+				toolsList = append(toolsList, &learningContextTool{userID: e.userID})
 			default:
 				rlog.Warn("unknown tool in config", "tool", toolName)
 			}
@@ -342,6 +347,27 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max] + "..."
+}
+
+// learningContextTool returns the active learning session summary for the user.
+type learningContextTool struct {
+	userID string
+}
+
+func (t *learningContextTool) Name() string {
+	return "get_learning_context"
+}
+
+func (t *learningContextTool) Description() string {
+	return "Retrieves the user's current learning session: what they want to learn and how they prefer to learn. Input is ignored."
+}
+
+func (t *learningContextTool) Call(ctx context.Context, input string) (string, error) {
+	resp, err := learning.GetCurrentSessionContext(ctx, &learning.GetCurrentSessionContextParams{UserID: t.userID})
+	if err != nil {
+		return "", err
+	}
+	return resp.Summary, nil
 }
 
 // agentCallbacks handles agent execution callbacks for tracing and streaming

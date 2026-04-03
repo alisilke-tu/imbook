@@ -93,27 +93,29 @@ func (pe *PipelineExecutor) agentInputForNode(execContext map[string]interface{}
 }
 
 type PipelineExecutor struct {
-	pipeline *Pipeline
-	nodes    map[string]*PipelineNode
-	edges    []PipelineEdge
-	configs  map[string]*AgentConfig
-	userID   string
-	apiKey   string
+	pipeline            *Pipeline
+	nodes               map[string]*PipelineNode
+	edges               []PipelineEdge
+	configs             map[string]*AgentConfig
+	userID              string
+	apiKey              string
+	learningSessionID   *string
 }
 
-func NewPipelineExecutor(pipeline *Pipeline, nodes []PipelineNode, edges []PipelineEdge, configs map[string]*AgentConfig, userID, apiKey string) *PipelineExecutor {
+func NewPipelineExecutor(pipeline *Pipeline, nodes []PipelineNode, edges []PipelineEdge, configs map[string]*AgentConfig, userID, apiKey string, learningSessionID *string) *PipelineExecutor {
 	nodeMap := make(map[string]*PipelineNode)
 	for i := range nodes {
 		n := nodes[i]
 		nodeMap[n.ID] = &n
 	}
 	return &PipelineExecutor{
-		pipeline: pipeline,
-		nodes:    nodeMap,
-		edges:    edges,
-		configs:  configs,
-		userID:   userID,
-		apiKey:   apiKey,
+		pipeline:          pipeline,
+		nodes:             nodeMap,
+		edges:             edges,
+		configs:           configs,
+		userID:            userID,
+		apiKey:            apiKey,
+		learningSessionID: learningSessionID,
 	}
 }
 
@@ -174,16 +176,17 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, query string) (*Pipelin
 			if err != nil {
 				errMsg := err.Error()
 				return &PipelineExecution{
-					PipelineID:      pe.pipeline.ID,
-					UserID:          pe.userID,
-					Query:           query,
-					AgentReplies:    combinedAgentReplies,
-					Trace:           combinedTrace,
-					ExecutionPath:   executionPath,
-					TotalDurationMs: int(time.Since(startTime).Milliseconds()),
-					Success:         false,
-					ErrorMessage:    &errMsg,
-					CreatedAt:       time.Now(),
+					PipelineID:        pe.pipeline.ID,
+					UserID:            pe.userID,
+					Query:             query,
+					AgentReplies:      combinedAgentReplies,
+					Trace:             combinedTrace,
+					ExecutionPath:     executionPath,
+					TotalDurationMs:   int(time.Since(startTime).Milliseconds()),
+					Success:           false,
+					ErrorMessage:      &errMsg,
+					CreatedAt:         time.Now(),
+					LearningSessionID: pe.learningSessionID,
 				}, err
 			}
 
@@ -207,16 +210,17 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, query string) (*Pipelin
 			output := execContext["output"].(string)
 			rlog.Info("pipeline: workflow completed", "duration_ms", duration)
 			return &PipelineExecution{
-				PipelineID:      pe.pipeline.ID,
-				UserID:          pe.userID,
-				Query:           query,
-				FinalOutput:     &output,
-				AgentReplies:    combinedAgentReplies,
-				Trace:           combinedTrace,
-				ExecutionPath:   executionPath,
-				TotalDurationMs: duration,
-				Success:         true,
-				CreatedAt:       time.Now(),
+				PipelineID:        pe.pipeline.ID,
+				UserID:            pe.userID,
+				Query:             query,
+				FinalOutput:       &output,
+				AgentReplies:      combinedAgentReplies,
+				Trace:             combinedTrace,
+				ExecutionPath:     executionPath,
+				TotalDurationMs:   duration,
+				Success:           true,
+				CreatedAt:         time.Now(),
+				LearningSessionID: pe.learningSessionID,
 			}, nil
 		}
 	}
@@ -309,16 +313,17 @@ func (pe *PipelineExecutor) ExecuteWithStreaming(ctx context.Context, query stri
 			if err != nil {
 				errMsg := err.Error()
 				return &PipelineExecution{
-					PipelineID:      pe.pipeline.ID,
-					UserID:          pe.userID,
-					Query:           query,
-					AgentReplies:    combinedAgentReplies,
-					Trace:           combinedTrace,
-					ExecutionPath:   executionPath,
-					TotalDurationMs: int(time.Since(startTime).Milliseconds()),
-					Success:         false,
-					ErrorMessage:    &errMsg,
-					CreatedAt:       time.Now(),
+					PipelineID:        pe.pipeline.ID,
+					UserID:            pe.userID,
+					Query:             query,
+					AgentReplies:      combinedAgentReplies,
+					Trace:             combinedTrace,
+					ExecutionPath:     executionPath,
+					TotalDurationMs:   int(time.Since(startTime).Milliseconds()),
+					Success:           false,
+					ErrorMessage:      &errMsg,
+					CreatedAt:         time.Now(),
+					LearningSessionID: pe.learningSessionID,
 				}, combinedTrace, combinedAgentReplies, err
 			}
 
@@ -336,16 +341,17 @@ func (pe *PipelineExecutor) ExecuteWithStreaming(ctx context.Context, query stri
 			output := execContext["output"].(string)
 			rlog.Info("pipeline: workflow completed", "duration_ms", duration)
 			return &PipelineExecution{
-				PipelineID:      pe.pipeline.ID,
-				UserID:          pe.userID,
-				Query:           query,
-				FinalOutput:     &output,
-				AgentReplies:    combinedAgentReplies,
-				Trace:           combinedTrace,
-				ExecutionPath:   executionPath,
-				TotalDurationMs: duration,
-				Success:         true,
-				CreatedAt:       time.Now(),
+				PipelineID:        pe.pipeline.ID,
+				UserID:            pe.userID,
+				Query:             query,
+				FinalOutput:       &output,
+				AgentReplies:      combinedAgentReplies,
+				Trace:             combinedTrace,
+				ExecutionPath:     executionPath,
+				TotalDurationMs:   duration,
+				Success:           true,
+				CreatedAt:         time.Now(),
+				LearningSessionID: pe.learningSessionID,
 			}, combinedTrace, combinedAgentReplies, nil
 		}
 	}

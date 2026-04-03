@@ -17,6 +17,8 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import { FirebaseContext } from "../lib/firebase.tsx";
+import LearningSessionDialog, { type LearningSession } from "./LearningSessionDialog.tsx";
+import SessionSidebar, { type SessionWithConversations } from "./SessionSidebar.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -346,6 +348,51 @@ export default function ChatPage() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
   const [workflowsLoading, setWorkflowsLoading] = useState(true);
 
+  const [sessionTree, setSessionTree] = useState<SessionWithConversations[]>([]);
+  const [activeSession, setActiveSession] = useState<LearningSession | null>(null);
+  const [learningSessionLoading, setLearningSessionLoading] = useState(true);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [viewingHistory, setViewingHistory] = useState(false);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+
+  const loadLearningData = async () => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token) return;
+    setLearningSessionLoading(true);
+    try {
+      const [treeRes, activeRes] = await Promise.all([
+        fetch(`${API_URL}/learning/session-tree`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_URL}/learning/me/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      if (treeRes.ok) {
+        const treeData = await treeRes.json();
+        setSessionTree((treeData.sessions as SessionWithConversations[]) ?? []);
+      }
+      if (activeRes.ok) {
+        const s = (await activeRes.json()) as LearningSession;
+        setActiveSession(s);
+        setSelectedSessionId(s.id);
+      } else {
+        setActiveSession(null);
+      }
+    } catch (e) {
+      console.error("Failed to load learning sessions:", e);
+    } finally {
+      setLearningSessionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (auth?.currentUser) {
+      void loadLearningData();
+    }
+  }, [auth?.currentUser]);
+
   useEffect(() => {
     const fetchWorkflows = async () => {
       const token = await auth?.currentUser?.getIdToken();
@@ -376,9 +423,71 @@ export default function ChatPage() {
     }
   }, [auth?.currentUser]);
 
+  const handleSelectSession = async (sessionId: string) => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/learning/sessions/${sessionId}/activate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { session: LearningSession };
+        setActiveSession(data.session);
+        setSelectedSessionId(sessionId);
+        setSelectedExecutionId(null);
+        setViewingHistory(false);
+        setMessages([]);
+        await loadLearningData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSelectConversation = async (sessionId: string, executionId: string) => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token) return;
+    try {
+      const res = await fetch(
+        `${API_URL}/learning/sessions/${sessionId}/conversations/${executionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        messages: { role: string; text: string }[];
+      };
+      const msgs: Message[] = data.messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        text: m.text,
+      }));
+      setMessages(msgs);
+      setSelectedSessionId(sessionId);
+      setSelectedExecutionId(executionId);
+      setViewingHistory(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const startNewChat = () => {
+    setViewingHistory(false);
+    setSelectedExecutionId(null);
+    setMessages([]);
+  };
+
   const send = async () => {
     const text = input.trim();
     if (!text || !auth?.currentUser) return;
+    if (viewingHistory) {
+      setError('Click "Start new chat" to continue.');
+      return;
+    }
+    const sid = activeSession?.id ?? selectedSessionId;
+    if (!sid) {
+      setError('Create a learning session with "New session" before chatting.');
+      return;
+    }
     setInput("");
     setMessages((prev) => [...prev, { role: "user", text }]);
     setLoading(true);
@@ -393,7 +502,11 @@ export default function ChatPage() {
       const res = await fetch(`${API_URL}/chat/pipeline/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text, pipeline_id: selectedWorkflow }),
+        body: JSON.stringify({
+          message: text,
+          pipeline_id: selectedWorkflow,
+          learning_session_id: sid,
+        }),
       });
       
       if (!res.ok) {
@@ -538,6 +651,7 @@ export default function ChatPage() {
           setStreamReply("");
           setStreamSteps([]);
           setStreamAgentReplies([]);
+          void loadLearningData();
           return;
         }
       };
@@ -597,14 +711,40 @@ export default function ChatPage() {
     }
   };
 
-  const selectedWorkflowData = workflows.find((w) => w.id === selectedWorkflow);
-
   return (
-    <Box sx={{ 
-      width: "100%",
-      bgcolor: "white",
-      minHeight: "100vh"
-    }}>
+    <Box
+      sx={{
+        width: "100%",
+        bgcolor: "white",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        alignItems: { xs: "stretch", md: "flex-start" },
+      }}
+    >
+      <LearningSessionDialog
+        open={sessionDialogOpen}
+        onClose={() => setSessionDialogOpen(false)}
+        apiUrl={API_URL}
+        getToken={() => auth?.currentUser?.getIdToken() ?? Promise.resolve(null)}
+        onCreated={async (session) => {
+          setActiveSession(session);
+          setSelectedSessionId(session.id);
+          setSelectedExecutionId(null);
+          setViewingHistory(false);
+          await loadLearningData();
+        }}
+      />
+      <SessionSidebar
+        sessions={sessionTree}
+        activeSessionId={activeSession?.id ?? null}
+        selectedSessionId={selectedSessionId}
+        selectedExecutionId={selectedExecutionId}
+        onNewSession={() => setSessionDialogOpen(true)}
+        onSelectSession={handleSelectSession}
+        onSelectConversation={handleSelectConversation}
+      />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
       <Container maxWidth="md" sx={{ py: { xs: 4, md: 7.5 }, px: { xs: 3, md: 5 } }}>
         <Box sx={{ mb: 5 }}>
           <Typography 
@@ -681,40 +821,33 @@ export default function ChatPage() {
                 ))}
               </Select>
             </FormControl>
-
-            {selectedWorkflowData && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Chip 
-                  label={selectedWorkflowData.is_enabled ? "Enabled" : "Disabled"} 
-                  size="small"
-                  sx={{
-                    bgcolor: "#F5F5F5",
-                    color: "primary.main",
-                    fontSize: "0.75rem",
-                    fontWeight: 500,
-                    height: "24px"
-                  }}
-                />
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    textTransform: "uppercase",
-                    letterSpacing: "0.0625rem",
-                    fontWeight: 500,
-                    color: "primary.main",
-                    fontSize: "0.75rem"
-                  }}
-                >
-                  {selectedWorkflowData.description || "—"}
-                </Typography>
-              </Box>
-            )}
           </Box>
         </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error}
+          </Alert>
+        )}
+
+        {!learningSessionLoading && !activeSession && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Create a learning session with &quot;New session&quot; in the sidebar (what you want to learn and how)
+            before chatting.
+          </Alert>
+        )}
+
+        {viewingHistory && (
+          <Alert
+            severity="warning"
+            sx={{ mb: 3 }}
+            action={
+              <Button color="inherit" size="small" onClick={startNewChat}>
+                Start new chat
+              </Button>
+            }
+          >
+            Viewing a past conversation. Messages are read-only until you start a new chat.
           </Alert>
         )}
 
@@ -962,7 +1095,7 @@ export default function ChatPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-              disabled={loading}
+              disabled={loading || viewingHistory}
               sx={{
                 "& .MuiOutlinedInput-root": {
                   bgcolor: "white",
@@ -991,7 +1124,7 @@ export default function ChatPage() {
             <Button 
               variant="contained" 
               onClick={send} 
-              disabled={loading || !input.trim()}
+              disabled={loading || !input.trim() || viewingHistory}
               sx={{
                 minWidth: "100px",
                 minHeight: "44px",
@@ -1010,6 +1143,7 @@ export default function ChatPage() {
           </Box>
         </Box>
       </Container>
+      </Box>
     </Box>
   );
 }

@@ -13,6 +13,11 @@ var ToolRegistry = []ToolDefinition{
 		Description: "Search the knowledge base of embedded text chunks from the book. Use when users ask about book content, chapters, or need relevant passages.",
 		Category:    "knowledge",
 	},
+	{
+		Name:        "get_learning_context",
+		Description: "Retrieves the user's current learning session: what they want to learn and how they prefer to learn. Use to personalize tutoring.",
+		Category:    "learning",
+	},
 }
 
 // ListToolsResponse returns available tools
