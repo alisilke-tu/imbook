@@ -19,11 +19,19 @@ var secrets struct {
 	FirebasePrivateKey string
 }
 
-// bootstrapAdminEmail is promoted to admin on first DB insert and via migration 2.
-const bootstrapAdminEmail = "benediktreinhard@icloud.com"
-
-func isBootstrapAdminEmail(email string) bool {
-	return strings.EqualFold(strings.TrimSpace(email), bootstrapAdminEmail)
+// isEmailBootstrapAdmin reports whether the email is listed in bootstrap_admin_emails (see migration 3).
+func isEmailBootstrapAdmin(ctx context.Context, email string) bool {
+	e := strings.TrimSpace(strings.ToLower(email))
+	if e == "" {
+		return false
+	}
+	var exists bool
+	err := usersDB.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM bootstrap_admin_emails WHERE LOWER(TRIM(email)) = $1
+		)
+	`, e).Scan(&exists)
+	return err == nil && exists
 }
 
 var (
@@ -74,7 +82,7 @@ func ValidateToken(ctx context.Context, token string) (auth.UID, *UserData, erro
 	if err != nil {
 		// If user doesn't exist in database, auto-create them (bootstrap admin by email when applicable)
 		if err == sqldb.ErrNoRows {
-			insertAdmin := isBootstrapAdminEmail(email)
+			insertAdmin := isEmailBootstrapAdmin(ctx, email)
 			_, insertErr := usersDB.Exec(ctx, `
 				INSERT INTO users (firebase_uid, email, display_name, is_admin, last_login)
 				VALUES ($1, $2, $3, $4, NOW())
@@ -89,7 +97,7 @@ func ValidateToken(ctx context.Context, token string) (auth.UID, *UserData, erro
 	} else {
 		// Existing row: sync login time; self-heal bootstrap admin if DB was never migrated
 		// or email column did not match (NULL / stale) so migration 2 updated 0 rows.
-		if isBootstrapAdminEmail(email) && !isAdmin {
+		if isEmailBootstrapAdmin(ctx, email) && !isAdmin {
 			_, err = usersDB.Exec(ctx, `
 				UPDATE users
 				SET is_admin = true, last_login = NOW(), email = CASE WHEN $2 <> '' THEN $2 ELSE email END
