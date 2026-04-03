@@ -14,10 +14,9 @@ function IndexPage() {
   const navigate = useNavigate();
   const { auth, isLoading: authLoading } = useContext(FirebaseContext);
 
-  // Redirect logged-in users to admin dashboard
   useEffect(() => {
     if (!authLoading && auth?.currentUser?.uid) {
-      navigate("/admin-dashboard");
+      navigate("/chat");
     }
   }, [authLoading, auth?.currentUser?.uid, navigate]);
 

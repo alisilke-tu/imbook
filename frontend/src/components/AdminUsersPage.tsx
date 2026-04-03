@@ -22,6 +22,8 @@ import {
   CircularProgress,
   Checkbox,
   FormControlLabel,
+  Switch,
+  Stack,
 } from "@mui/material";
 import { Delete as DeleteIcon, VpnKey as VpnKeyIcon } from "@mui/icons-material";
 import { FirebaseContext } from "../lib/firebase";
@@ -30,7 +32,7 @@ import getRequestClient from "../lib/getRequestClient";
 interface User {
   firebase_uid: string;
   email: string;
-  display_name: string;
+  display_name: string | null;
   is_admin: boolean;
   last_login: string | null;
   created_at: string;
@@ -60,6 +62,8 @@ export default function AdminUsersPage() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [userToReset, setUserToReset] = useState<User | null>(null);
   const [resetting, setResetting] = useState(false);
+
+  const [roleUpdatingUid, setRoleUpdatingUid] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -157,6 +161,27 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleToggleAdmin = async (user: User, nextAdmin: boolean) => {
+    if (!auth?.currentUser) return;
+    if (user.firebase_uid === auth.currentUser.uid) return;
+    if (user.is_admin === nextAdmin) return;
+
+    try {
+      setRoleUpdatingUid(user.firebase_uid);
+      setError(null);
+      const token = await auth.currentUser.getIdToken();
+      const client = getRequestClient(token);
+      await client.auth.UpdateUserRole(user.firebase_uid, { is_admin: nextAdmin });
+      setSuccess(`Updated role for ${user.email}`);
+      await fetchUsers();
+    } catch (err) {
+      console.error("Failed to update role:", err);
+      setError(err instanceof Error ? err.message : "Failed to update role");
+    } finally {
+      setRoleUpdatingUid(null);
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Never";
     return new Date(dateString).toLocaleString();
@@ -194,7 +219,7 @@ export default function AdminUsersPage() {
               lineHeight: 1.6
             }}
           >
-            Create and manage user accounts.
+            Create users, assign admin roles, and manage accounts.
           </Typography>
         </Box>
         <Button 
@@ -303,17 +328,32 @@ export default function AdminUsersPage() {
                   {user.display_name || "-"}
                 </TableCell>
                 <TableCell sx={{ py: 2.5 }}>
-                  <Chip
-                    label={user.is_admin ? "Admin" : "User"}
-                    size="small"
-                    sx={{
-                      bgcolor: user.is_admin ? "primary.main" : "#F5F5F5",
-                      color: user.is_admin ? "white" : "#666666",
-                      fontSize: "0.75rem",
-                      fontWeight: 500,
-                      height: "24px"
-                    }}
-                  />
+                  {user.firebase_uid === auth?.currentUser?.uid ? (
+                    <Chip
+                      label={user.is_admin ? "Admin" : "User"}
+                      size="small"
+                      sx={{
+                        bgcolor: user.is_admin ? "primary.main" : "#F5F5F5",
+                        color: user.is_admin ? "white" : "#666666",
+                        fontSize: "0.75rem",
+                        fontWeight: 500,
+                        height: "24px"
+                      }}
+                    />
+                  ) : (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Switch
+                        size="small"
+                        checked={user.is_admin}
+                        disabled={roleUpdatingUid === user.firebase_uid}
+                        onChange={(_, checked) => void handleToggleAdmin(user, checked)}
+                        inputProps={{ "aria-label": `Admin role for ${user.email}` }}
+                      />
+                      <Typography sx={{ fontSize: "0.875rem", color: "#666666" }}>
+                        {user.is_admin ? "Admin" : "User"}
+                      </Typography>
+                    </Stack>
+                  )}
                 </TableCell>
                 <TableCell sx={{ fontSize: "0.9375rem", color: "#666666", py: 2.5 }}>
                   {formatDate(user.last_login)}

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"encore.dev/beta/auth"
@@ -16,6 +17,13 @@ import (
 var secrets struct {
 	// FirebasePrivateKey is the JSON credentials for calling Firebase.
 	FirebasePrivateKey string
+}
+
+// bootstrapAdminEmail is promoted to admin on first DB insert and via migration 2.
+const bootstrapAdminEmail = "benediktreinhard@icloud.com"
+
+func isBootstrapAdminEmail(email string) bool {
+	return strings.EqualFold(strings.TrimSpace(email), bootstrapAdminEmail)
 }
 
 var (
@@ -64,16 +72,17 @@ func ValidateToken(ctx context.Context, token string) (auth.UID, *UserData, erro
 	`, string(uid)).Scan(&isAdmin)
 
 	if err != nil {
-		// If user doesn't exist in database, auto-create them as regular user
+		// If user doesn't exist in database, auto-create them (bootstrap admin by email when applicable)
 		if err == sqldb.ErrNoRows {
+			insertAdmin := isBootstrapAdminEmail(email)
 			_, insertErr := usersDB.Exec(ctx, `
 				INSERT INTO users (firebase_uid, email, display_name, is_admin, last_login)
-				VALUES ($1, $2, $3, false, NOW())
-			`, string(uid), email, name)
+				VALUES ($1, $2, $3, $4, NOW())
+			`, string(uid), email, name, insertAdmin)
 			if insertErr != nil {
 				return "", nil, insertErr
 			}
-			isAdmin = false
+			isAdmin = insertAdmin
 		} else {
 			return "", nil, err
 		}
@@ -330,4 +339,39 @@ func ListUsers(ctx context.Context) (*ListUsersResponse, error) {
 	}
 
 	return &ListUsersResponse{Users: users}, nil
+}
+
+// UpdateUserRoleParams sets admin flag for an existing user.
+type UpdateUserRoleParams struct {
+	IsAdmin bool `json:"is_admin"`
+}
+
+// UpdateUserRole updates a user's admin role. Admin only; cannot change your own role.
+//
+//encore:api auth method=PATCH path=/auth/users/:uid/role
+func UpdateUserRole(ctx context.Context, uid string, params *UpdateUserRoleParams) (*User, error) {
+	if !IsAdmin(ctx) {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "admin access required"}
+	}
+	if params == nil {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "body required"}
+	}
+
+	currentUID, _ := auth.UserID()
+	if string(currentUID) == uid {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "cannot change your own role"}
+	}
+
+	var u User
+	err := usersDB.QueryRow(ctx, `
+		UPDATE users SET is_admin = $1 WHERE firebase_uid = $2
+		RETURNING firebase_uid, email, display_name, is_admin, last_login, created_at
+	`, params.IsAdmin, uid).Scan(&u.FirebaseUID, &u.Email, &u.DisplayName, &u.IsAdmin, &u.LastLogin, &u.CreatedAt)
+	if err != nil {
+		if err == sqldb.ErrNoRows {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "user not found"}
+		}
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to update user role"}
+	}
+	return &u, nil
 }

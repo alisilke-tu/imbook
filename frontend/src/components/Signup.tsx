@@ -28,7 +28,7 @@ const Signup = () => {
     if (password === confirmPassword) {
       try {
         await createUserWithEmailAndPassword(auth!, email, password);
-        navigate("/");
+        navigate("/chat");
       } catch {
         setNotice("Sorry, something went wrong. Please try again.");
       }

@@ -25,7 +25,7 @@ const Login = () => {
 
     try {
       await signInWithEmailAndPassword(auth!, email, password);
-      navigate("/");
+      navigate("/chat");
     } catch {
       setNotice("You entered a wrong username or password.");
     }

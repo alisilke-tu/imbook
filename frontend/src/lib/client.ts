@@ -182,6 +182,13 @@ export namespace auth {
     }
 
     /**
+     * UpdateUserRoleParams sets admin flag for an existing user.
+     */
+    export interface UpdateUserRoleParams {
+        "is_admin": boolean
+    }
+
+    /**
      * User represents a user in the system.
      */
     export interface User {
@@ -203,6 +210,7 @@ export namespace auth {
             this.GetMe = this.GetMe.bind(this)
             this.ListUsers = this.ListUsers.bind(this)
             this.ResetPassword = this.ResetPassword.bind(this)
+            this.UpdateUserRole = this.UpdateUserRole.bind(this)
         }
 
         /**
@@ -246,6 +254,14 @@ export namespace auth {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("POST", `/auth/users/${encodeURIComponent(uid)}/reset-password`)
             return await resp.json() as ResetPasswordResponse
+        }
+
+        /**
+         * UpdateUserRole updates a user's admin role. Admin only; cannot change your own role.
+         */
+        public async UpdateUserRole(uid: string, params: UpdateUserRoleParams): Promise<User> {
+            const resp = await this.baseClient.callTypedAPI("PATCH", `/auth/users/${encodeURIComponent(uid)}/role`, JSON.stringify(params))
+            return await resp.json() as User
         }
     }
 }

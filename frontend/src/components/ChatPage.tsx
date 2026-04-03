@@ -350,7 +350,6 @@ export default function ChatPage() {
 
   const [sessionTree, setSessionTree] = useState<SessionWithConversations[]>([]);
   const [activeSession, setActiveSession] = useState<LearningSession | null>(null);
-  const [learningSessionLoading, setLearningSessionLoading] = useState(true);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [viewingHistory, setViewingHistory] = useState(false);
@@ -359,7 +358,6 @@ export default function ChatPage() {
   const loadLearningData = async () => {
     const token = await auth?.currentUser?.getIdToken();
     if (!token) return;
-    setLearningSessionLoading(true);
     try {
       const [treeRes, activeRes] = await Promise.all([
         fetch(`${API_URL}/learning/session-tree`, {
@@ -382,8 +380,6 @@ export default function ChatPage() {
       }
     } catch (e) {
       console.error("Failed to load learning sessions:", e);
-    } finally {
-      setLearningSessionLoading(false);
     }
   };
 
@@ -827,13 +823,6 @@ export default function ChatPage() {
         {error && (
           <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
             {error}
-          </Alert>
-        )}
-
-        {!learningSessionLoading && !activeSession && (
-          <Alert severity="info" sx={{ mb: 3 }}>
-            Create a learning session with &quot;New session&quot; in the sidebar (what you want to learn and how)
-            before chatting.
           </Alert>
         )}
 
