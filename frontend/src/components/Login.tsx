@@ -6,8 +6,8 @@ import {
   TextField,
   Button,
   Alert,
-  Paper,
   Typography,
+  Stack,
 } from "@mui/material";
 import { FirebaseContext } from "../lib/firebase.tsx";
 
@@ -35,57 +35,117 @@ const Login = () => {
     <Box
       sx={{
         width: "100%",
+        minHeight: "calc(100vh - 72px)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        bgcolor: "background.paper",
+        py: 8,
       }}
     >
-      <Paper elevation={3} sx={{ p: 4, maxWidth: 500, width: "100%" }}>
-        <Box component="form" sx={{ display: "flex", flexDirection: "column" }}>
-          <Typography variant="h4" component="h1" gutterBottom>
+      <Box
+        sx={{
+          maxWidth: 480,
+          width: "100%",
+          px: 3,
+        }}
+      >
+        <Stack spacing={3}>
+          <Typography
+            variant="h2"
+            component="h1"
+            sx={{
+              fontSize: "2rem",
+              textAlign: "center",
+            }}
+          >
             Login
           </Typography>
 
           {notice && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ borderRadius: 2 }}>
               {notice}
             </Alert>
           )}
 
-          <TextField
-            type="email"
-            id="exampleInputEmail1"
-            label="Email address"
-            placeholder="name@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            fullWidth
-            margin="normal"
-            required
-          />
+          <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box>
+              <Typography
+                component="label"
+                htmlFor="loginEmail"
+                sx={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "text.secondary",
+                  mb: 1,
+                  display: "block",
+                }}
+              >
+                Email address
+              </Typography>
+              <TextField
+                type="email"
+                id="loginEmail"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                fullWidth
+                required
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: "56px",
+                  },
+                }}
+              />
+            </Box>
 
-          <TextField
-            type="password"
-            id="exampleInputPassword1"
-            label="Password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            fullWidth
-            margin="normal"
-            required
-          />
+            <Box>
+              <Typography
+                component="label"
+                htmlFor="loginPassword"
+                sx={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "text.secondary",
+                  mb: 1,
+                  display: "block",
+                }}
+              >
+                Password
+              </Typography>
+              <TextField
+                type="password"
+                id="loginPassword"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                fullWidth
+                required
+                sx={{
+                  "& .MuiInputBase-root": {
+                    height: "56px",
+                  },
+                }}
+              />
+            </Box>
 
-          <Button
-            type="submit"
-            variant="contained"
-            onClick={loginWithUsernameAndPassword}
-            sx={{ mt: 2 }}
-          >
-            Submit
-          </Button>
-        </Box>
-      </Paper>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              onClick={loginWithUsernameAndPassword}
+              sx={{
+                mt: 2,
+                minHeight: "56px",
+                fontSize: "1.0625rem",
+              }}
+            >
+              Login
+            </Button>
+
+          </Box>
+        </Stack>
+      </Box>
     </Box>
   );
 };

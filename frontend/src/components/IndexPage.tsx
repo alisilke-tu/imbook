@@ -1,42 +1,18 @@
-import { useState, useContext, useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
   Container,
   Typography,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
   Button,
-  Checkbox,
-  FormControlLabel,
   Stack,
-  Divider,
-  Snackbar,
-  Alert,
-  CircularProgress,
+  Link,
 } from "@mui/material";
-import getRequestClient from "../lib/getRequestClient";
 import { FirebaseContext } from "../lib/firebase";
 
 function IndexPage() {
   const navigate = useNavigate();
   const { auth, isLoading: authLoading } = useContext(FirebaseContext);
-  const [question, setQuestion] = useState("");
-  const [background, setBackground] = useState("");
-  const [email, setEmail] = useState("");
-  const [consent, setConsent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({
-    open: false,
-    message: "",
-    severity: "success",
-  });
 
   // Redirect logged-in users to admin dashboard
   useEffect(() => {
@@ -45,374 +21,300 @@ function IndexPage() {
     }
   }, [authLoading, auth?.currentUser?.uid, navigate]);
 
-  const handleSubmit = async () => {
-    // Validate form
-    if (!question.trim()) {
-      setSnackbar({
-        open: true,
-        message: "Please enter a question",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (!background) {
-      setSnackbar({
-        open: true,
-        message: "Please select your professional background",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (!consent) {
-      setSnackbar({
-        open: true,
-        message: "Please consent to the data privacy policy",
-        severity: "error",
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const client = getRequestClient(undefined);
-      await client.submissions.Submit({
-        question: question,
-        role: background,
-        email: email,
-      });
-
-      setSnackbar({
-        open: true,
-        message: "Thank you! Your response has been submitted successfully.",
-        severity: "success",
-      });
-
-      // Reset form
-      setQuestion("");
-      setBackground("");
-      setEmail("");
-      setConsent(false);
-    } catch (error: any) {
-      setSnackbar({
-        open: true,
-        message: error.message || "Failed to submit. Please try again.",
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* Main Content */}
+    <Box sx={{ width: "100%", minHeight: "100vh" }}>
+      {/* Hero Section - Full Height */}
       <Container
         maxWidth={false}
         sx={{
-          flex: 1,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          px: { xs: 4, md: 15 },
-          py: 10,
+          minHeight: "calc(100vh - 72px)",
+          px: { xs: 3, md: 10 },
+          position: "relative",
         }}
       >
         <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={8}
+          spacing={5}
           sx={{
             width: "100%",
-            maxWidth: "1200px",
+            maxWidth: "800px",
             alignItems: "center",
           }}
         >
-          {/* Left Side - Heading and Description */}
-          <Stack
-            direction="row"
-            spacing={2}
+          <Typography
+            variant="caption"
             sx={{
-              flex: 1,
-              maxWidth: "600px",
+              fontSize: { xs: "2rem", md: "3rem" },
+              fontWeight: 900,
+              letterSpacing: "tight",
             }}
           >
-            <Divider
-              orientation="vertical"
-              sx={{
-                height: "100px",
-                mt: 3,
-                borderColor: "#E5E7EB",
-                borderRightWidth: 1,
-              }}
-            />
-            <Stack spacing={4}>
-              <Typography
-                variant="h1"
-                sx={{
-                  fontSize: { xs: "2.5rem", md: "4rem" },
-                  fontWeight: 600,
-                  color: "#111827",
-                  lineHeight: 1.1,
-                  letterSpacing: "-0.025em",
-                }}
-              >
-                Redefining Information Management.
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: "1.25rem",
-                  color: "#6B7280",
-                  lineHeight: 1.6,
-                }}
-              >
-                We are conducting a study to understand how professionals
-                navigate the complexity of modern data. Your questions and
-                background will help shape the future of our tools.
-              </Typography>
-            </Stack>
-          </Stack>
+            IM·ILP
+          </Typography>
 
-          {/* Right Side - Form */}
-          <Stack
-            spacing={3}
+          <Typography
+            variant="h1"
             sx={{
-              flex: 1,
-              maxWidth: "500px",
+              fontSize: { xs: "2.5rem", md: "3.5rem" },
+              textAlign: "center",
+            }}
+          >
+            Interactive Learning Platform
+          </Typography>
+
+          <Typography
+            variant="subtitle1"
+            sx={{
+              textAlign: "center",
+            }}
+          >
+            Based on Professor Krcmar's Information Management
+          </Typography>
+
+          <Typography
+            variant="body2"
+            sx={{
+              textAlign: "center",
+              maxWidth: "640px",
+            }}
+          >
+            An interactive learning environment where you can engage with course
+            content, define your learning patterns, and personalize your
+            educational journey. Built as part of a TUM master thesis project.
+          </Typography>
+
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate("/login")}
+            sx={{
               width: "100%",
+              maxWidth: "400px",
+              minHeight: "56px",
+              fontSize: "1.0625rem",
+              mt: 3,
             }}
           >
-            {/* Question Field */}
-            <FormControl fullWidth>
-              <Typography
-                component="label"
-                sx={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#374151",
-                  mb: 1,
-                }}
-              >
-                What would you like to know about information management?
-              </Typography>
-              <TextField
-                multiline
-                rows={5}
-                placeholder="Type your question here..."
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    "& fieldset": {
-                      borderColor: "#E5E7EB",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "#E5E7EB",
-                    },
-                    "&.Mui-focused fieldset": {
-                      borderColor: "black",
-                      borderWidth: 1,
-                    },
-                  },
-                  "& .MuiInputBase-input": {
-                    fontSize: "1rem",
-                    color: "#111827",
-                  },
-                  "& .MuiInputBase-input::placeholder": {
-                    color: "#9CA3AF",
-                    opacity: 1,
-                  },
-                }}
-              />
-            </FormControl>
-
-            {/* Professional Background Field */}
-            <FormControl fullWidth>
-              <Typography
-                component="label"
-                sx={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#374151",
-                  mb: 1,
-                }}
-              >
-                Your professional background
-              </Typography>
-              <Select
-                value={background}
-                onChange={(e) => setBackground(e.target.value)}
-                displayEmpty
-                sx={{
-                  height: "56px",
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#E5E7EB",
-                  },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#E5E7EB",
-                  },
-                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "black",
-                    borderWidth: 1,
-                  },
-                  "& .MuiSelect-select": {
-                    fontSize: "1rem",
-                    color: background ? "#111827" : "#9CA3AF",
-                  },
-                }}
-              >
-                <MenuItem value="" disabled>
-                  Select your role
-                </MenuItem>
-                <MenuItem value="cio">CIO (Chief Information Officer)</MenuItem>
-                <MenuItem value="cto">CTO (Chief Technology Officer)</MenuItem>
-                <MenuItem value="ceo">CEO (Chief Executive Officer)</MenuItem>
-                <MenuItem value="cfo">CFO (Chief Financial Officer)</MenuItem>
-                <MenuItem value="coo">COO (Chief Operating Officer)</MenuItem>
-                <MenuItem value="other-c-level">Other C-Level Executive</MenuItem>
-                <MenuItem value="director">Director</MenuItem>
-                <MenuItem value="manager">Manager</MenuItem>
-                <MenuItem value="analyst">Analyst</MenuItem>
-                <MenuItem value="consultant">Consultant</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-            </FormControl>
-
-            {/* Email Field */}
-            <FormControl fullWidth>
-              <Typography
-                component="label"
-                sx={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#374151",
-                  mb: 1,
-                }}
-              >
-                Email address (Optional)
-              </Typography>
-              <TextField
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    height: "56px",
-                    "& fieldset": {
-                      borderColor: "#E5E7EB",
-                    },
-                    "&:hover fieldset": {
-                      borderColor: "#E5E7EB",
-                    },
-                    "&.Mui-focused fieldset": {
-                      borderColor: "black",
-                      borderWidth: 1,
-                    },
-                  },
-                  "& .MuiInputBase-input": {
-                    fontSize: "1rem",
-                    color: "#111827",
-                  },
-                }}
-              />
-            </FormControl>
-
-            {/* Consent Checkbox */}
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={consent}
-                  onChange={(e) => setConsent(e.target.checked)}
-                  sx={{
-                    color: "black",
-                    "&.Mui-checked": {
-                      color: "black",
-                    },
-                    "& .MuiSvgIcon-root": {
-                      fontSize: 20,
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography
-                  sx={{
-                    fontSize: "0.875rem",
-                    color: "#6B7280",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  I consent to the data privacy policy and agree to share my
-                  response for research purposes.
-                </Typography>
-              }
-              sx={{
-                alignItems: "flex-start",
-                mt: 1,
-              }}
-            />
-
-            {/* Submit Button */}
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleSubmit}
-              disabled={loading}
-              sx={{
-                height: "56px",
-                backgroundColor: "black",
-                color: "white",
-                fontSize: "1rem",
-                fontWeight: 600,
-                textTransform: "none",
-                mt: 2,
-                "&:hover": {
-                  backgroundColor: "#111827",
-                },
-                "&:active": {
-                  backgroundColor: "#374151",
-                },
-                "&.Mui-disabled": {
-                  backgroundColor: "#9CA3AF",
-                  color: "white",
-                },
-              }}
-            >
-              {loading ? (
-                <CircularProgress size={24} sx={{ color: "white" }} />
-              ) : (
-                "Send Response"
-              )}
-            </Button>
-          </Stack>
+            Login
+          </Button>
         </Stack>
+
+        <Box
+          component="a"
+          href="#about"
+          sx={{
+            position: "absolute",
+            bottom: { xs: 4, md: 8 },
+            animation: "bounce 1s infinite",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+            e.preventDefault();
+            document.getElementById("about")?.scrollIntoView({ behavior: "smooth" });
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 512 512"
+            fill="currentColor"
+            style={{ color: "#999999" }}
+          >
+            <path
+              d="M112 184l144 144 144-144"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="48"
+            />
+          </svg>
+        </Box>
       </Container>
 
-      {/* Snackbar for feedback */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      {/* About Section */}
+      <Box
+        id="about"
+        sx={{
+          bgcolor: "background.paper",
+          px: { xs: 3, md: 10 },
+          py: { xs: 6, md: 12.5 },
+        }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: "100%" }}
+        <Container
+          maxWidth={false}
+          sx={{
+            maxWidth: "800px",
+            mx: "auto",
+          }}
         >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+          <Typography
+            variant="h2"
+            sx={{
+              mb: 6,
+            }}
+          >
+            About the Project
+          </Typography>
+
+          <Box
+            sx={{
+              bgcolor: "#F5F5F5",
+              p: { xs: 4, md: 5 },
+              borderRadius: 0,
+              borderLeft: "4px solid",
+              borderColor: "primary.main",
+            }}
+          >
+            <Typography
+              variant="caption"
+              component="p"
+              sx={{
+                mb: 3,
+              }}
+            >
+              Master Thesis Project – Technical University of Munich
+            </Typography>
+
+            <Typography
+              variant="h3"
+              sx={{
+                mb: 2,
+              }}
+            >
+              Research Objective
+            </Typography>
+
+            <Typography
+              variant="body1"
+              sx={{
+                mb: 2.5,
+              }}
+            >
+              This research project focuses on developing an interactive digital
+              learning platform that transforms the traditional approach to
+              Information Management education. Building upon Professor Krcmar's
+              comprehensive curriculum at the Technical University of Munich,
+              the platform introduces adaptive learning mechanisms that respond
+              to individual student behaviors and preferences.
+            </Typography>
+
+            <Typography
+              variant="body1"
+              sx={{
+                mb: 2.5,
+              }}
+            >
+              The system employs advanced pattern recognition algorithms to
+              identify and analyze learning behaviors, enabling the platform to
+              provide personalized content recommendations and optimize the
+              educational experience for each user. Through continuous
+              interaction and feedback loops, the platform adapts its content
+              delivery strategy to maximize learning outcomes.
+            </Typography>
+
+            <Typography
+              variant="body1"
+              sx={{
+                mb: 2.5,
+              }}
+            >
+              The theoretical foundation of this work combines principles from
+              cognitive psychology, human-computer interaction, and information
+              systems research to create a comprehensive framework for
+              interactive learning in the context of Information Management
+              education.
+            </Typography>
+
+            <Typography
+              variant="h3"
+              sx={{
+                mt: 5,
+                mb: 2.5,
+              }}
+            >
+              Platform Capabilities
+            </Typography>
+
+            <Stack spacing={1.5} component="ul" sx={{ pl: 0, listStyle: "none" }}>
+              {[
+                "Interactive content engagement modules with real-time feedback mechanisms",
+                "Personalized learning pattern recognition using machine learning algorithms",
+                "Behavioral analytics and insights dashboard for self-reflection",
+                "Adaptive content delivery system responding to individual learning pace",
+                "Progress tracking and assessment tools integrated throughout the curriculum",
+              ].map((item, index) => (
+                <Box
+                  component="li"
+                  key={index}
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Typography
+                    component="span"
+                    sx={{
+                      mr: 1.5,
+                      color: "text.secondary",
+                    }}
+                  >
+                    •
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      lineHeight: 1.8,
+                    }}
+                  >
+                    {item}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+
+            <Typography
+              sx={{
+                mt: 7.5,
+                fontSize: "0.9375rem",
+                fontWeight: 300,
+                fontStyle: "italic",
+                color: "#999999",
+              }}
+            >
+              Based on the Information Management curriculum by Professor
+              Krcmar, Technical University of Munich
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              textAlign: "center",
+              mt: 5,
+            }}
+          >
+            <Link
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              sx={{
+                fontSize: "0.9375rem",
+                fontWeight: 400,
+              }}
+            >
+              ↑ Back to Top
+            </Link>
+          </Box>
+        </Container>
+      </Box>
     </Box>
   );
 }

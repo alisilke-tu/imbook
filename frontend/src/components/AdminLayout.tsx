@@ -4,7 +4,7 @@ import { Box, Container, Tab, Tabs, Typography } from "@mui/material";
 export default function AdminLayout() {
   const location = useLocation();
   const path = location.pathname;
-  const value = path.includes("/settings") ? 3 : path.includes("/roadmap") ? 2 : path.includes("/etl-pipeline") ? 1 : 0;
+  const value = path.includes("/settings") ? 3 : path.includes("/roadmap") ? 2 : path.includes("/users") ? 1 : 0;
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -12,8 +12,8 @@ export default function AdminLayout() {
         Admin
       </Typography>
       <Tabs value={value} sx={{ mb: 3 }}>
-        <Tab label="Submissions" component={RouterLink} to="/admin-dashboard/submissions" />
         <Tab label="ETL-Pipeline" component={RouterLink} to="/admin-dashboard/etl-pipeline" />
+        <Tab label="Users" component={RouterLink} to="/admin-dashboard/users" />
         <Tab label="Roadmap" component={RouterLink} to="/admin-dashboard/roadmap" />
         <Tab label="Settings" component={RouterLink} to="/admin-dashboard/settings" />
       </Tabs>

@@ -5,6 +5,7 @@ import (
 
 	a "encore.app/backend/auth"
 	"encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 	"encore.dev/rlog"
 )
 
@@ -17,6 +18,10 @@ type DashboardData struct {
 //
 //encore:api auth method=GET path=/admin
 func GetAdminDashboardData(ctx context.Context) (*DashboardData, error) {
-	rlog.Info("Admin dashboard data requested", "user", auth.Data().(*a.UserData))
+	userData := auth.Data().(*a.UserData)
+	if !userData.IsAdmin {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "admin access required"}
+	}
+	rlog.Info("Admin dashboard data requested", "user", userData)
 	return &DashboardData{Value: "Important stuff"}, nil
 }

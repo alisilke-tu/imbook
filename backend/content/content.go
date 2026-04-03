@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	a "encore.app/backend/auth"
 	"encore.app/backend/db"
 	"encore.app/backend/settings"
 	"encore.dev/beta/auth"
@@ -43,6 +44,14 @@ type ImportResponse struct {
 //encore:api auth raw method=POST path=/content/import
 func Import(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+	
+	// Check admin access
+	userData := auth.Data().(*a.UserData)
+	if !userData.IsAdmin {
+		writeErr(w, errs.PermissionDenied, "admin access required")
+		return
+	}
+	
 	start := time.Now()
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -140,6 +149,11 @@ type EmbedChunkResponse struct {
 //
 //encore:api auth method=POST path=/content/embed-chunk
 func EmbedChunk(ctx context.Context, params *EmbedChunkParams) (*EmbedChunkResponse, error) {
+	userData := auth.Data().(*a.UserData)
+	if !userData.IsAdmin {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "admin access required"}
+	}
+	
 	if params == nil || params.ParagraphID == "" || params.Content == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "paragraph_id and content are required"}
 	}
@@ -317,6 +331,11 @@ func SearchChunks(ctx context.Context, params *SearchChunksParams) (*SearchChunk
 //
 //encore:api auth method=GET path=/content
 func List(ctx context.Context) (*ListResponse, error) {
+	userData := auth.Data().(*a.UserData)
+	if !userData.IsAdmin {
+		return nil, &errs.Error{Code: errs.PermissionDenied, Message: "admin access required"}
+	}
+	
 	out := &ListResponse{}
 	rows, err := contentDB.Query(ctx, `
 		SELECT id, chapter_number, title, parent_chapter_id, sort_order, start_page, end_page
