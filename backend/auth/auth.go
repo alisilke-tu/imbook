@@ -87,10 +87,29 @@ func ValidateToken(ctx context.Context, token string) (auth.UID, *UserData, erro
 			return "", nil, err
 		}
 	} else {
-		// Update last login timestamp
-		_, _ = usersDB.Exec(ctx, `
-			UPDATE users SET last_login = NOW() WHERE firebase_uid = $1
-		`, string(uid))
+		// Existing row: sync login time; self-heal bootstrap admin if DB was never migrated
+		// or email column did not match (NULL / stale) so migration 2 updated 0 rows.
+		if isBootstrapAdminEmail(email) && !isAdmin {
+			_, err = usersDB.Exec(ctx, `
+				UPDATE users
+				SET is_admin = true, last_login = NOW(), email = CASE WHEN $2 <> '' THEN $2 ELSE email END
+				WHERE firebase_uid = $1
+			`, string(uid), email)
+			if err != nil {
+				return "", nil, err
+			}
+			isAdmin = true
+		} else {
+			if email != "" {
+				_, _ = usersDB.Exec(ctx, `
+					UPDATE users SET last_login = NOW(), email = $2 WHERE firebase_uid = $1
+				`, string(uid), email)
+			} else {
+				_, _ = usersDB.Exec(ctx, `
+					UPDATE users SET last_login = NOW() WHERE firebase_uid = $1
+				`, string(uid))
+			}
+		}
 	}
 
 	usr := &UserData{
