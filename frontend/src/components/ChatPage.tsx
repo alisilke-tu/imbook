@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Collapse,
+  Container,
   Paper,
   TextField,
   Typography,
@@ -69,6 +70,7 @@ function showAgentReplyBlocks(agentReplies: AgentReply[] | undefined, finalText:
   return (filtered?.length ?? 0) > 0;
 }
 
+/** Omits the last agent when its text is identical to the pipeline final (avoids duplicate blocks). */
 function filterAgentRepliesForDisplay(
   agentReplies: AgentReply[] | undefined,
   finalText: string
@@ -198,25 +200,25 @@ function MessageItem({ message }: { message: Message }) {
                             {step.tool || "tool"}
                           </Typography>
                         </Box>
-                        <Paper 
+                        <Paper
                           elevation={0}
-                          sx={{ 
+                          sx={{
                             bgcolor: "white",
                             border: "1px solid #E5E5E5",
                             borderRadius: 1,
                             px: 2,
-                            py: 1.5
+                            py: 1.5,
                           }}
                         >
-                          <Typography 
-                            component="pre" 
-                            sx={{ 
+                          <Typography
+                            component="pre"
+                            sx={{
                               whiteSpace: "pre-wrap",
                               fontFamily: "monospace",
                               fontSize: "0.8125rem",
                               color: "#4A4A4A",
                               lineHeight: 1.6,
-                              m: 0
+                              m: 0,
                             }}
                           >
                             {step.log ? `REASONING:\n${step.log}\n\n` : ""}
@@ -330,13 +332,12 @@ type Workflow = {
   is_enabled: boolean;
 };
 
-export default function AdminChatPage() {
+export default function ChatPage() {
   const { auth } = useContext(FirebaseContext);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Live stream state: steps and reply as they arrive
   const [streamSteps, setStreamSteps] = useState<ChatStep[]>([]);
   const [streamAgentReplies, setStreamAgentReplies] = useState<AgentReply[]>([]);
   const [streamReply, setStreamReply] = useState("");
@@ -403,7 +404,6 @@ export default function AdminChatPage() {
         return;
       }
 
-      // Handle SSE streaming
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -600,410 +600,416 @@ export default function AdminChatPage() {
   const selectedWorkflowData = workflows.find((w) => w.id === selectedWorkflow);
 
   return (
-    <Box sx={{ width: "100%" }}>
-      <Box sx={{ mb: 5 }}>
-        <Typography 
-          variant="h4" 
-          component="h1" 
-          sx={{ 
-            fontSize: { xs: "1.5rem", md: "2rem" },
-            fontWeight: 700,
-            color: "black",
-            letterSpacing: "-0.03125rem",
-            mb: 1.5
-          }}
-        >
-          Chat with Agent Pipeline
-        </Typography>
-        <Typography 
-          sx={{ 
-            fontSize: "1.0625rem",
-            color: "#666666",
-            lineHeight: 1.6
-          }}
-        >
-          Ask questions about the book. The agent can search embedded chunks when relevant.
-        </Typography>
-      </Box>
+    <Box sx={{ 
+      width: "100%",
+      bgcolor: "white",
+      minHeight: "100vh"
+    }}>
+      <Container maxWidth="md" sx={{ py: { xs: 4, md: 7.5 }, px: { xs: 3, md: 5 } }}>
+        <Box sx={{ mb: 5 }}>
+          <Typography 
+            variant="h2" 
+            component="h1" 
+            sx={{ 
+              fontSize: { xs: "2rem", md: "2.625rem" },
+              fontWeight: 700,
+              color: "black",
+              letterSpacing: "-0.03125rem",
+              mb: 1.5
+            }}
+          >
+            Chat
+          </Typography>
+          <Typography 
+            sx={{ 
+              fontSize: "1.0625rem",
+              color: "#666666",
+              lineHeight: 1.6
+            }}
+          >
+            Ask questions about the book. The agent can search embedded chunks when relevant.
+          </Typography>
+        </Box>
 
-      <Box sx={{ 
-        mb: 5,
-        pb: 5,
-        borderBottom: "1px solid #E5E5E5"
-      }}>
-        <Typography 
-          variant="caption" 
-          sx={{ 
-            textTransform: "uppercase",
-            letterSpacing: "0.0625rem",
-            fontWeight: 500,
-            color: "#999999",
-            fontSize: "0.75rem",
-            mb: 1.5,
-            display: "block"
-          }}
-        >
-          Workflow
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-          <FormControl sx={{ minWidth: 300 }}>
-            <Select
-              value={selectedWorkflow}
-              onChange={(e) => setSelectedWorkflow(e.target.value)}
-              disabled={workflowsLoading || loading || workflows.length === 0}
-              displayEmpty
-              sx={{
-                bgcolor: "white",
-                border: "1px solid #E5E5E5",
-                borderRadius: 2,
-                height: "44px",
-                fontSize: "0.9375rem",
-                "& .MuiOutlinedInput-notchedOutline": {
-                  border: "none"
-                },
-                "&:hover": {
-                  borderColor: "primary.main"
-                },
-                "&.Mui-focused": {
-                  borderColor: "primary.main"
-                }
-              }}
-            >
-              {workflows.map((wf) => (
-                <MenuItem key={wf.id} value={wf.id}>
-                  {wf.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {selectedWorkflowData && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Chip 
-                label={selectedWorkflowData.is_enabled ? "Enabled" : "Disabled"} 
-                size="small"
+        <Box sx={{ 
+          mb: 5,
+          pb: 5,
+          borderBottom: "1px solid #E5E5E5"
+        }}>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              textTransform: "uppercase",
+              letterSpacing: "0.0625rem",
+              fontWeight: 500,
+              color: "#999999",
+              fontSize: "0.75rem",
+              mb: 1.5,
+              display: "block"
+            }}
+          >
+            Workflow
+          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <FormControl sx={{ minWidth: 300 }}>
+              <Select
+                value={selectedWorkflow}
+                onChange={(e) => setSelectedWorkflow(e.target.value)}
+                disabled={workflowsLoading || loading || workflows.length === 0}
+                displayEmpty
                 sx={{
-                  bgcolor: "#F5F5F5",
-                  color: "primary.main",
-                  fontSize: "0.75rem",
-                  fontWeight: 500,
-                  height: "24px"
+                  bgcolor: "white",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 2,
+                  height: "44px",
+                  fontSize: "0.9375rem",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    border: "none"
+                  },
+                  "&:hover": {
+                    borderColor: "primary.main"
+                  },
+                  "&.Mui-focused": {
+                    borderColor: "primary.main"
+                  }
                 }}
-              />
+              >
+                {workflows.map((wf) => (
+                  <MenuItem key={wf.id} value={wf.id}>
+                    {wf.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {selectedWorkflowData && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Chip 
+                  label={selectedWorkflowData.is_enabled ? "Enabled" : "Disabled"} 
+                  size="small"
+                  sx={{
+                    bgcolor: "#F5F5F5",
+                    color: "primary.main",
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                    height: "24px"
+                  }}
+                />
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    textTransform: "uppercase",
+                    letterSpacing: "0.0625rem",
+                    fontWeight: 500,
+                    color: "primary.main",
+                    fontSize: "0.75rem"
+                  }}
+                >
+                  {selectedWorkflowData.description || "—"}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        <Box sx={{ mb: 5 }}>
+          {messages.length === 0 && !loading && (
+            <Typography sx={{ color: "#999999", fontSize: "0.9375rem" }}>
+              Send a message to start.
+            </Typography>
+          )}
+          
+          {messages.map((m, i) => (
+            <MessageItem key={i} message={m} />
+          ))}
+          
+          {loading &&
+            (streamSteps.length > 0 ||
+              streamAgentReplies.length > 0 ||
+              streamReply ||
+              currentNode) && (
+            <Box sx={{ mb: 6 }}>
               <Typography 
                 variant="caption" 
                 sx={{ 
                   textTransform: "uppercase",
                   letterSpacing: "0.0625rem",
                   fontWeight: 500,
-                  color: "primary.main",
-                  fontSize: "0.75rem"
+                  color: "#999999",
+                  fontSize: "0.75rem",
+                  mb: 1.5,
+                  display: "block"
                 }}
               >
-                {selectedWorkflowData.description || "—"}
+                Assistant
               </Typography>
-            </Box>
-          )}
-        </Box>
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Box sx={{ mb: 5 }}>
-        {messages.length === 0 && !loading && (
-          <Typography sx={{ color: "#999999", fontSize: "0.9375rem" }}>
-            Send a message to start.
-          </Typography>
-        )}
-        
-        {messages.map((m, i) => (
-          <MessageItem key={i} message={m} />
-        ))}
-        
-        {loading &&
-          (streamSteps.length > 0 ||
-            streamAgentReplies.length > 0 ||
-            streamReply ||
-            currentNode) && (
-          <Box sx={{ mb: 6 }}>
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                textTransform: "uppercase",
-                letterSpacing: "0.0625rem",
-                fontWeight: 500,
-                color: "#999999",
-                fontSize: "0.75rem",
-                mb: 1.5,
-                display: "block"
-              }}
-            >
-              Assistant
-            </Typography>
-
-            {streamSteps.length > 0 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  bgcolor: "#FAFAFA",
-                  borderRadius: 2,
-                  p: 3,
-                  mb: 3,
-                  border: "none",
-                }}
-              >
-                <Typography
-                  variant="body2"
+              {streamSteps.length > 0 && (
+                <Paper
+                  elevation={0}
                   sx={{
-                    fontWeight: 500,
-                    color: "#666666",
-                    fontSize: "0.9375rem",
-                    mb: 2,
+                    bgcolor: "#FAFAFA",
+                    borderRadius: 2,
+                    p: 3,
+                    mb: 3,
+                    border: "none",
                   }}
                 >
-                  Thinking ({streamSteps.length} step{streamSteps.length !== 1 ? "s" : ""})
-                </Typography>
-                {groupStepsForThinking(streamSteps).map((group) => (
-                  <Box key={group.key} sx={{ mb: 2 }}>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{
-                        fontWeight: 600,
-                        color: "#555555",
-                        fontSize: "0.875rem",
-                        mb: 1,
-                      }}
-                    >
-                      {group.title}
-                    </Typography>
-                    {group.steps.map((step, j) => (
-                      <Box key={`${group.key}-${j}`} sx={{ mb: j < group.steps.length - 1 ? 2 : 0 }}>
-                        <Box
-                          sx={{
-                            bgcolor:
-                              step.tool === "Pipeline: agent run" ? "#E8F0FE" : "#F8F8F8",
-                            borderRadius: 1,
-                            px: 2,
-                            py: 1,
-                            mb: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          {step.agent_name ? (
-                            <Chip
-                              label={step.agent_name}
-                              size="small"
-                              sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600 }}
-                            />
-                          ) : null}
-                          <Typography variant="caption" sx={{ color: "#999999", fontWeight: 500 }}>
-                            {step.tool || "tool"}
-                          </Typography>
-                        </Box>
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            bgcolor: "white",
-                            border: "1px solid #E5E5E5",
-                            borderRadius: 1,
-                            px: 2,
-                            py: 1.5,
-                          }}
-                        >
-                          <Typography
-                            component="pre"
-                            sx={{
-                              whiteSpace: "pre-wrap",
-                              fontFamily: "monospace",
-                              fontSize: "0.8125rem",
-                              color: "#4A4A4A",
-                              lineHeight: 1.6,
-                              m: 0,
-                            }}
-                          >
-                            {step.log ? `REASONING:\n${step.log}\n\n` : ""}
-                            {step.tool_input ? `INPUT: ${step.tool_input}\n\n` : ""}
-                            {step.observation}
-                          </Typography>
-                        </Paper>
-                      </Box>
-                    ))}
-                  </Box>
-                ))}
-              </Paper>
-            )}
-
-            {streamAgentReplies.length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    textTransform: "uppercase",
-                    letterSpacing: "0.0625rem",
-                    fontWeight: 500,
-                    color: "#999999",
-                    fontSize: "0.75rem",
-                    mb: 1.5,
-                    display: "block",
-                  }}
-                >
-                  Agent outputs
-                </Typography>
-                {streamAgentReplies.map((ar, idx) => (
-                  <Paper
-                    key={`${ar.graph_node_id ?? ar.agent_name}-${idx}`}
-                    elevation={0}
+                  <Typography
+                    variant="body2"
                     sx={{
-                      bgcolor: "#F5F7FA",
-                      border: "1px solid #E5E5E5",
-                      borderRadius: 2,
-                      p: 2,
-                      mb: idx < streamAgentReplies.length - 1 ? 2 : 0,
+                      fontWeight: 500,
+                      color: "#666666",
+                      fontSize: "0.9375rem",
+                      mb: 2,
                     }}
                   >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexWrap: "wrap" }}>
-                      {ar.agent_name ? (
-                        <Chip
-                          label={ar.agent_name}
-                          size="small"
-                          sx={{ height: 24, fontSize: "0.75rem", fontWeight: 600 }}
-                        />
-                      ) : null}
-                      {ar.graph_node_id ? (
-                        <Typography variant="caption" sx={{ color: "#999999", fontFamily: "monospace" }}>
-                          {ar.graph_node_id.slice(0, 8)}…
-                        </Typography>
-                      ) : null}
+                    Thinking ({streamSteps.length} step{streamSteps.length !== 1 ? "s" : ""})
+                  </Typography>
+                  {groupStepsForThinking(streamSteps).map((group) => (
+                    <Box key={group.key} sx={{ mb: 2 }}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          fontWeight: 600,
+                          color: "#555555",
+                          fontSize: "0.875rem",
+                          mb: 1,
+                        }}
+                      >
+                        {group.title}
+                      </Typography>
+                      {group.steps.map((step, j) => (
+                        <Box key={`${group.key}-${j}`} sx={{ mb: j < group.steps.length - 1 ? 2 : 0 }}>
+                          <Box
+                            sx={{
+                              bgcolor:
+                                step.tool === "Pipeline: agent run" ? "#E8F0FE" : "#F8F8F8",
+                              borderRadius: 1,
+                              px: 2,
+                              py: 1,
+                              mb: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {step.agent_name ? (
+                              <Chip
+                                label={step.agent_name}
+                                size="small"
+                                sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600 }}
+                              />
+                            ) : null}
+                            <Typography variant="caption" sx={{ color: "#999999", fontWeight: 500 }}>
+                              {step.tool || "tool"}
+                            </Typography>
+                          </Box>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              bgcolor: "white",
+                              border: "1px solid #E5E5E5",
+                              borderRadius: 1,
+                              px: 2,
+                              py: 1.5,
+                            }}
+                          >
+                            <Typography
+                              component="pre"
+                              sx={{
+                                whiteSpace: "pre-wrap",
+                                fontFamily: "monospace",
+                                fontSize: "0.8125rem",
+                                color: "#4A4A4A",
+                                lineHeight: 1.6,
+                                m: 0,
+                              }}
+                            >
+                              {step.log ? `REASONING:\n${step.log}\n\n` : ""}
+                              {step.tool_input ? `INPUT: ${step.tool_input}\n\n` : ""}
+                              {step.observation}
+                            </Typography>
+                          </Paper>
+                        </Box>
+                      ))}
                     </Box>
-                    <Typography sx={{ fontSize: "1rem", lineHeight: 1.7, color: "#4A4A4A", whiteSpace: "pre-wrap" }}>
-                      {ar.content}
-                    </Typography>
-                  </Paper>
-                ))}
-              </Box>
-            )}
+                  ))}
+                </Paper>
+              )}
 
-            {streamSteps.length === 0 && streamAgentReplies.length === 0 && (
-              <Paper 
-                elevation={0}
-                sx={{ 
-                  bgcolor: "#FAFAFA", 
-                  borderRadius: 2,
-                  p: 3,
-                  mb: 3
-                }}
-              >
-                <Typography 
-                  variant="body2" 
+              {streamAgentReplies.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      textTransform: "uppercase",
+                      letterSpacing: "0.0625rem",
+                      fontWeight: 500,
+                      color: "#999999",
+                      fontSize: "0.75rem",
+                      mb: 1.5,
+                      display: "block",
+                    }}
+                  >
+                    Agent outputs
+                  </Typography>
+                  {streamAgentReplies.map((ar, idx) => (
+                    <Paper
+                      key={`${ar.graph_node_id ?? ar.agent_name}-${idx}`}
+                      elevation={0}
+                      sx={{
+                        bgcolor: "#F5F7FA",
+                        border: "1px solid #E5E5E5",
+                        borderRadius: 2,
+                        p: 2,
+                        mb: idx < streamAgentReplies.length - 1 ? 2 : 0,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, flexWrap: "wrap" }}>
+                        {ar.agent_name ? (
+                          <Chip
+                            label={ar.agent_name}
+                            size="small"
+                            sx={{ height: 24, fontSize: "0.75rem", fontWeight: 600 }}
+                          />
+                        ) : null}
+                        {ar.graph_node_id ? (
+                          <Typography variant="caption" sx={{ color: "#999999", fontFamily: "monospace" }}>
+                            {ar.graph_node_id.slice(0, 8)}…
+                          </Typography>
+                        ) : null}
+                      </Box>
+                      <Typography sx={{ fontSize: "1rem", lineHeight: 1.7, color: "#4A4A4A", whiteSpace: "pre-wrap" }}>
+                        {ar.content}
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Box>
+              )}
+
+              {streamSteps.length === 0 && streamAgentReplies.length === 0 && (
+                <Paper 
+                  elevation={0}
                   sx={{ 
-                    fontWeight: 500,
-                    color: "#666666",
-                    fontSize: "0.9375rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5
+                    bgcolor: "#FAFAFA", 
+                    borderRadius: 2,
+                    p: 3,
+                    mb: 3
                   }}
                 >
-                  <PsychologyIcon fontSize="small" /> 
-                  {currentNode ? `Executing: ${currentNode}` : "Thinking…"}
-                </Typography>
-              </Paper>
-            )}
-            
-            {streamReply && (
-              <Typography 
-                sx={{ 
-                  fontSize: "1.0625rem",
-                  lineHeight: 1.7,
-                  color: "#4A4A4A",
-                  whiteSpace: "pre-wrap"
-                }}
-              >
-                {streamReply}
-              </Typography>
-            )}
-          </Box>
-        )}
-        
-        {loading &&
-          streamSteps.length === 0 &&
-          streamAgentReplies.length === 0 &&
-          !streamReply &&
-          !currentNode && (
-          <Typography sx={{ color: "#999999", fontSize: "0.9375rem" }}>
-            Thinking…
-          </Typography>
-        )}
-      </Box>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 500,
+                      color: "#666666",
+                      fontSize: "0.9375rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5
+                    }}
+                  >
+                    <PsychologyIcon fontSize="small" /> 
+                    {currentNode ? `Executing: ${currentNode}` : "Thinking…"}
+                  </Typography>
+                </Paper>
+              )}
 
-      <Box sx={{ 
-        pt: 4,
-        borderTop: "1px solid #E5E5E5"
-      }}>
-        <Box sx={{ display: "flex", alignItems: "flex-end", gap: 1.5 }}>
-          <TextField
-            fullWidth
-            multiline
-            minRows={1}
-            maxRows={4}
-            placeholder="Type a message..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            disabled={loading}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                bgcolor: "white",
-                border: "1px solid #E5E5E5",
-                borderRadius: 2,
-                minHeight: "44px",
-                fontSize: "0.9375rem",
-                px: 2.5,
-                py: 1.5,
-                "& fieldset": {
-                  border: "none"
-                },
-                "&:hover": {
-                  borderColor: "primary.main"
-                },
-                "&.Mui-focused": {
-                  borderColor: "primary.main"
-                }
-              },
-              "& .MuiInputBase-input::placeholder": {
-                color: "#999999",
-                opacity: 1
-              }
-            }}
-          />
-          <Button 
-            variant="contained" 
-            onClick={send} 
-            disabled={loading || !input.trim()}
-            sx={{
-              minWidth: "100px",
-              minHeight: "44px",
-              borderRadius: 2,
-              fontSize: "0.9375rem",
-              fontWeight: 600,
-              textTransform: "none",
-              boxShadow: "none",
-              "&:hover": {
-                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)"
-              }
-            }}
-          >
-            Send
-          </Button>
+              {streamReply && (
+                <Typography 
+                  sx={{ 
+                    fontSize: "1.0625rem",
+                    lineHeight: 1.7,
+                    color: "#4A4A4A",
+                    whiteSpace: "pre-wrap"
+                  }}
+                >
+                  {streamReply}
+                </Typography>
+              )}
+            </Box>
+          )}
+          
+          {loading &&
+            streamSteps.length === 0 &&
+            streamAgentReplies.length === 0 &&
+            !streamReply &&
+            !currentNode && (
+            <Typography sx={{ color: "#999999", fontSize: "0.9375rem" }}>
+              Thinking…
+            </Typography>
+          )}
         </Box>
-      </Box>
+
+        <Box sx={{ 
+          pt: 4,
+          borderTop: "1px solid #E5E5E5"
+        }}>
+          <Box sx={{ display: "flex", alignItems: "flex-end", gap: 1.5 }}>
+            <TextField
+              fullWidth
+              multiline
+              minRows={1}
+              maxRows={4}
+              placeholder="Type a message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              disabled={loading}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  bgcolor: "white",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 2,
+                  minHeight: "44px",
+                  fontSize: "0.9375rem",
+                  px: 2.5,
+                  py: 1.5,
+                  "& fieldset": {
+                    border: "none"
+                  },
+                  "&:hover": {
+                    borderColor: "primary.main"
+                  },
+                  "&.Mui-focused": {
+                    borderColor: "primary.main"
+                  }
+                },
+                "& .MuiInputBase-input::placeholder": {
+                  color: "#999999",
+                  opacity: 1
+                }
+              }}
+            />
+            <Button 
+              variant="contained" 
+              onClick={send} 
+              disabled={loading || !input.trim()}
+              sx={{
+                minWidth: "100px",
+                minHeight: "44px",
+                borderRadius: 2,
+                fontSize: "0.9375rem",
+                fontWeight: 600,
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": {
+                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)"
+                }
+              }}
+            >
+              Send
+            </Button>
+          </Box>
+        </Box>
+      </Container>
     </Box>
   );
 }

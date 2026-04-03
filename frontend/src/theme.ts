@@ -5,9 +5,9 @@ const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#3070B3',
-      dark: '#005293',
-      light: '#64A0C8',
+      main: '#0a1929',
+      dark: '#050d14',
+      light: '#1a2f42',
       contrastText: '#FFFFFF',
     },
     background: {
@@ -72,7 +72,7 @@ const theme = createTheme({
       fontWeight: 500,
       textTransform: 'uppercase',
       letterSpacing: '1px',
-      color: '#3070B3',
+      color: '#0a1929',
     },
   },
   components: {
@@ -107,9 +107,9 @@ const theme = createTheme({
           },
         },
         containedPrimary: {
-          backgroundColor: '#3070B3',
+          backgroundColor: '#0a1929',
           '&:hover': {
-            backgroundColor: '#005293',
+            backgroundColor: '#050d14',
           },
         },
       },
@@ -121,7 +121,7 @@ const theme = createTheme({
           textDecoration: 'none',
           transition: 'color 0.2s',
           '&:hover': {
-            color: '#3070B3',
+            color: '#0a1929',
           },
         },
       },
@@ -137,7 +137,7 @@ const theme = createTheme({
               borderColor: '#E5E5E5',
             },
             '&.Mui-focused fieldset': {
-              borderColor: '#3070B3',
+              borderColor: '#0a1929',
               borderWidth: '1px',
             },
           },

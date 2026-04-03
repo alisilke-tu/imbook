@@ -259,8 +259,9 @@ func ListChunks(ctx context.Context) (*ListChunksResponse, error) {
 
 // SearchChunksParams are the parameters for the private SearchChunks API.
 type SearchChunksParams struct {
-	UserID string `json:"user_id"`
-	Query  string `json:"query"`
+	UserID    string `json:"user_id"`
+	Query     string `json:"query"`
+	DatasetID string `json:"dataset_id"` // REQUIRED - specifies which dataset to search
 }
 
 // SearchChunksResponse is returned by SearchChunks.
@@ -268,22 +269,46 @@ type SearchChunksResponse struct {
 	Chunks []ChunkRow `json:"chunks"`
 }
 
-// SearchChunks runs a vector similarity search over embedded chunks. Private; used by the chat service.
+// SearchChunks runs a vector similarity search over embedded chunks in a specific dataset. Private; used by the chat service and agent tools.
 //
 //encore:api private
 func SearchChunks(ctx context.Context, params *SearchChunksParams) (*SearchChunksResponse, error) {
-	if params == nil || params.UserID == "" || params.Query == "" {
-		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "user_id and query are required"}
+	if params == nil || params.UserID == "" || params.Query == "" || params.DatasetID == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "user_id, query, and dataset_id are required"}
 	}
+
+	// Get dataset to determine embedding model
+	var embeddingModel string
+	var embeddingDimension int
+	err := contentDB.QueryRow(ctx, `
+		SELECT embedding_model, embedding_dim
+		FROM embedding_datasets
+		WHERE id = $1 AND status = 'ready'
+	`, params.DatasetID).Scan(&embeddingModel, &embeddingDimension)
+	
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return nil, &errs.Error{Code: errs.NotFound, Message: "dataset not found or not ready"}
+		}
+		rlog.Error("failed to get dataset", "err", err)
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to get dataset"}
+	}
+
+	// Get model spec
+	modelSpec, err := GetModelSpec(embeddingModel)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := settings.GetGeminiKey(ctx, &settings.GetGeminiKeyParams{UserID: params.UserID})
 	if err != nil {
 		return nil, err
 	}
 	llm, err := openai.New(
-		openai.WithBaseURL(openRouterBaseURL),
+		openai.WithBaseURL(modelSpec.BaseURL),
 		openai.WithToken(resp.Key),
-		openai.WithEmbeddingModel(openRouterEmbeddingModel),
-		openai.WithEmbeddingDimensions(embeddingDim),
+		openai.WithEmbeddingModel(modelSpec.ModelPath),
+		openai.WithEmbeddingDimensions(embeddingDimension),
 	)
 	if err != nil {
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to create embedding client"}
@@ -296,18 +321,19 @@ func SearchChunks(ctx context.Context, params *SearchChunksParams) (*SearchChunk
 		return &SearchChunksResponse{Chunks: []ChunkRow{}}, nil
 	}
 	vec := embeddings[0]
-	if len(vec) > embeddingDim {
-		vec = vec[:embeddingDim]
-	} else if len(vec) < embeddingDim {
+	if len(vec) > embeddingDimension {
+		vec = vec[:embeddingDimension]
+	} else if len(vec) < embeddingDimension {
 		return nil, &errs.Error{Code: errs.Internal, Message: "embedding dimension mismatch"}
 	}
 	vecStr := embeddingToString(vec)
 	rows, err := contentDB.Query(ctx, `
 		SELECT id, paragraph_id, chunk_index, content
 		FROM chunks
+		WHERE dataset_id = $2
 		ORDER BY embedding <=> $1::vector
 		LIMIT 10
-	`, vecStr)
+	`, vecStr, params.DatasetID)
 	if err != nil {
 		rlog.Error("vector search failed", "err", err)
 		return nil, &errs.Error{Code: errs.Internal, Message: "search failed"}

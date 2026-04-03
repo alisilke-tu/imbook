@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"encore.app/backend/content"
+	"encore.app/backend/pipelines"
 	"encore.app/backend/settings"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
@@ -30,8 +31,11 @@ type streamWriter interface {
 }
 
 // searchChunksTool is a tool that calls the content service to search embedded chunks.
+// NOTE: This is a legacy implementation for standalone chat. 
+// TODO: Add user setting for default_dataset_id to make this work with versioned datasets.
 type searchChunksTool struct {
-	userID string
+	userID    string
+	datasetID string // Required - should be set from user settings
 }
 
 func (t *searchChunksTool) Name() string {
@@ -46,9 +50,20 @@ func (t *searchChunksTool) Call(ctx context.Context, input string) (string, erro
 	if input == "" {
 		return "Query is required.", nil
 	}
-	resp, err := content.SearchChunks(ctx, &content.SearchChunksParams{UserID: t.userID, Query: input})
+	
+	// Check if dataset_id is configured
+	if t.datasetID == "" {
+		rlog.Warn("search_chunks called without dataset_id in standalone chat")
+		return "Knowledge base search is not configured. Please use pipeline-based chat with configured datasets.", nil
+	}
+	
+	resp, err := content.SearchChunks(ctx, &content.SearchChunksParams{
+		UserID:    t.userID,
+		Query:     input,
+		DatasetID: t.datasetID,
+	})
 	if err != nil {
-		rlog.Error("search_chunks tool failed", "err", err)
+		rlog.Error("search_chunks tool failed", "err", err, "dataset_id", t.datasetID)
 		return fmt.Sprintf("Search failed: %v", err), nil
 	}
 	if len(resp.Chunks) == 0 {
@@ -184,7 +199,9 @@ func Chat(ctx context.Context, params *ChatParams) (*ChatResponse, error) {
 		rlog.Error("failed to create llm", "err", err)
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to create model"}
 	}
-	searchTool := &searchChunksTool{userID: string(uid)}
+	// TODO: Get default_dataset_id from user settings
+	// For now, search tool will return a message that it's not configured
+	searchTool := &searchChunksTool{userID: string(uid), datasetID: ""}
 	agentTools := []tools.Tool{searchTool}
 	agent := agents.NewOneShotAgent(llm, agentTools)
 	executor := agents.NewExecutor(agent, agents.WithReturnIntermediateSteps())
@@ -263,7 +280,9 @@ func ChatStream(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	streamCb := &streamingCallbacks{w: sse}
-	searchTool := &searchChunksTool{userID: string(uid)}
+	// TODO: Get default_dataset_id from user settings
+	// For now, search tool will return a message that it's not configured
+	searchTool := &searchChunksTool{userID: string(uid), datasetID: ""}
 	agentTools := []tools.Tool{searchTool}
 	agent := agents.NewOneShotAgent(llm, agentTools)
 	executor := agents.NewExecutor(agent, agents.WithReturnIntermediateSteps(), agents.WithCallbacksHandler(streamCb))
@@ -279,4 +298,171 @@ func ChatStream(w http.ResponseWriter, req *http.Request) {
 	// Reply is already sent by HandleAgentFinish when the agent finishes
 	_ = result
 	sse.WriteEvent("done", nil)
+}
+
+// ChatPipelineParams for pipeline-powered chat
+type ChatPipelineParams struct {
+	Message    string `json:"message"`
+	PipelineID string `json:"pipeline_id"` // Optional; uses first available workflow if empty
+}
+
+// ChatPipelineResponse includes execution metadata
+type ChatPipelineResponse struct {
+	Reply        string                  `json:"reply"`
+	ChunksUsed   int                     `json:"chunks_used"`
+	ConfigUsed   string                  `json:"config_used"`
+	Trace        []pipelines.ExecutionStep `json:"trace,omitempty"`
+	AgentReplies []pipelines.AgentReply  `json:"agent_replies,omitempty"`
+}
+
+// ChatWithPipeline executes chat using a saved workflow (pipeline graph).
+//
+//encore:api auth method=POST path=/chat/pipeline
+func ChatWithPipeline(ctx context.Context, params *ChatPipelineParams) (*ChatPipelineResponse, error) {
+	if params == nil || params.Message == "" {
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "message is required"}
+	}
+
+	pipelineID := params.PipelineID
+	if pipelineID == "" {
+		var err error
+		pipelineID, err = pipelines.GetFirstPipelineIDForUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	execResult, err := pipelines.ExecutePipeline(ctx, pipelineID, &pipelines.ExecutePipelineParams{Query: params.Message})
+	if err != nil {
+		return nil, err
+	}
+
+	reply := ""
+	if execResult.FinalOutput != nil {
+		reply = *execResult.FinalOutput
+	}
+
+	detail, err := pipelines.GetPipeline(ctx, pipelineID)
+	name := pipelineID
+	if err == nil && detail != nil {
+		name = detail.Pipeline.Name
+	}
+
+	return &ChatPipelineResponse{
+		Reply:        reply,
+		ChunksUsed:   0,
+		ConfigUsed:   name,
+		Trace:        nil,
+		AgentReplies: execResult.AgentReplies,
+	}, nil
+}
+
+// StreamPipeline streams chat responses by executing a saved workflow (pipeline graph).
+//
+//encore:api auth raw method=POST path=/chat/pipeline/stream
+func StreamPipeline(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+	uid, _ := auth.UserID()
+
+	var params ChatPipelineParams
+	if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if params.Message == "" {
+		http.Error(w, "message is required", http.StatusBadRequest)
+		return
+	}
+
+	pipelineID := params.PipelineID
+	if pipelineID == "" {
+		var err error
+		pipelineID, err = pipelines.GetFirstPipelineIDForUser(ctx)
+		if err != nil {
+			code := http.StatusPreconditionFailed
+			if errs.Code(err) != errs.FailedPrecondition {
+				code = http.StatusInternalServerError
+			}
+			http.Error(w, err.Error(), code)
+			return
+		}
+	}
+
+	apiKeyResp, err := settings.GetGeminiKey(ctx, &settings.GetGeminiKeyParams{UserID: string(uid)})
+	if err != nil {
+		if errs.Code(err) == errs.NotFound {
+			http.Error(w, "API key not configured", http.StatusPreconditionFailed)
+			return
+		}
+		http.Error(w, "failed to get API key", http.StatusInternalServerError)
+		return
+	}
+
+	executor, err := pipelines.LoadPipelineExecutor(ctx, pipelineID, string(uid), apiKeyResp.Key)
+	if err != nil {
+		code := http.StatusInternalServerError
+		switch errs.Code(err) {
+		case errs.NotFound:
+			code = http.StatusNotFound
+		case errs.FailedPrecondition:
+			code = http.StatusPreconditionFailed
+		}
+		http.Error(w, err.Error(), code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	stream := &sseWriter{w: w, flusher: flusher}
+
+	execution, trace, agentReplies, err := executor.ExecuteWithStreaming(ctx, params.Message, stream)
+	if execution != nil {
+		_ = pipelines.PersistPipelineExecution(ctx, execution)
+	}
+	if err != nil {
+		stream.WriteEvent("error", map[string]string{"message": err.Error()})
+		return
+	}
+
+	reply := ""
+	if execution != nil && execution.FinalOutput != nil {
+		reply = *execution.FinalOutput
+	}
+
+	toolCalls := 0
+	for _, step := range trace {
+		if step.StepType == "tool_call" {
+			toolCalls++
+		}
+	}
+
+	stream.WriteEvent("done", map[string]interface{}{
+		"reply":         reply,
+		"tool_calls":    toolCalls,
+		"tokens_used":   0,
+		"trace":         trace,
+		"agent_replies": agentReplies,
+	})
+}
+
+// sseWriter implements streamWriter for SSE
+type sseWriter struct {
+	w       http.ResponseWriter
+	flusher http.Flusher
+}
+
+func (s *sseWriter) WriteEvent(eventType string, data any) {
+	jsonData, _ := json.Marshal(data)
+	fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", eventType, jsonData)
+	s.flusher.Flush()
 }

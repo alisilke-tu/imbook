@@ -17,13 +17,17 @@ import {
 } from "@mui/material";
 import AdminLayout from "./components/AdminLayout.tsx";
 import AdminETLPipelinePage from "./components/AdminETLPipelinePage.tsx";
-import AdminSettingsPage from "./components/AdminSettingsPage.tsx";
-import AdminRoadmapPage from "./components/AdminRoadmapPage.tsx";
+import AdminDatasetEmbeddingDetailPage from "./components/AdminDatasetEmbeddingDetailPage.tsx";
+import AdminPipelinesPage from "./components/AdminPipelinesPage.tsx";
 import AdminUsersPage from "./components/AdminUsersPage.tsx";
+import AdminChatsPage from "./components/AdminChatsPage.tsx";
 import UserSettingsPage from "./components/UserSettingsPage.tsx";
+import ChatPage from "./components/ChatPage.tsx";
 import IndexPage from "./components/IndexPage.tsx";
 import Login from "./components/Login.tsx";
 import Signup from "./components/Signup.tsx";
+import PipelineConfiguratorPage from "./components/PipelineConfiguratorPage.tsx";
+import PipelineWorkflowPage from "./components/PipelineWorkflowPage.tsx";
 import { FirebaseContext, FirebaseProvider } from "./lib/firebase.tsx";
 import { UserRoleProvider, useUserRole } from "./lib/useUserRole.tsx";
 
@@ -58,6 +62,10 @@ const router = createBrowserRouter([
             Component: ProtectedRoutes,
             children: [
               {
+                path: "chat",
+                Component: ChatPage,
+              },
+              {
                 path: "settings",
                 Component: UserSettingsPage,
               },
@@ -65,15 +73,24 @@ const router = createBrowserRouter([
                 Component: AdminProtectedRoutes,
                 children: [
                   {
-                    path: "admin-dashboard",
+                    path: "admin",
                     Component: AdminLayout,
                     children: [
-                      { index: true, element: <Navigate to="etl-pipeline" replace /> },
-                      { path: "etl-pipeline", Component: AdminETLPipelinePage },
+                      { index: true, element: <Navigate to="datasets" replace /> },
+                      { path: "datasets", Component: AdminETLPipelinePage },
+                      { path: "datasets/:datasetId", Component: AdminDatasetEmbeddingDetailPage },
+                      { path: "pipelines", Component: AdminPipelinesPage },
                       { path: "users", Component: AdminUsersPage },
-                      { path: "roadmap", Component: AdminRoadmapPage },
-                      { path: "settings", Component: AdminSettingsPage },
+                      { path: "chats", Component: AdminChatsPage },
                     ],
+                  },
+                  {
+                    path: "admin/pipelines/configurator",
+                    Component: PipelineConfiguratorPage,
+                  },
+                  {
+                    path: "admin/pipelines/workflow",
+                    Component: PipelineWorkflowPage,
                   },
                 ],
               },
@@ -146,6 +163,16 @@ function Layout({ children }: PropsWithChildren) {
                 <>
                   <Link
                     component={RouterLink}
+                    to="/chat"
+                    sx={{
+                      fontSize: '0.9375rem',
+                      fontWeight: 400,
+                    }}
+                  >
+                    Chat
+                  </Link>
+                  <Link
+                    component={RouterLink}
                     to="/settings"
                     sx={{
                       fontSize: '0.9375rem',
@@ -157,7 +184,7 @@ function Layout({ children }: PropsWithChildren) {
                   {!roleLoading && isAdmin && (
                     <Link
                       component={RouterLink}
-                      to="/admin-dashboard"
+                      to="/admin"
                       sx={{
                         fontSize: '0.9375rem',
                         fontWeight: 400,

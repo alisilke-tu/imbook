@@ -2,10 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
-  Container,
   Dialog,
   DialogActions,
   DialogContent,
@@ -167,19 +164,54 @@ export default function AdminUsersPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="xl" sx={{ py: 4, display: "flex", justifyContent: "center" }}>
+      <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          User Management
-        </Typography>
-        <Button variant="contained" onClick={() => setCreateDialogOpen(true)}>
+    <Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 5 }}>
+        <Box>
+          <Typography 
+            variant="h4" 
+            component="h1" 
+            sx={{ 
+              fontSize: { xs: "1.5rem", md: "2rem" },
+              fontWeight: 700,
+              color: "black",
+              letterSpacing: "-0.03125rem",
+              mb: 1.5
+            }}
+          >
+            User Management
+          </Typography>
+          <Typography 
+            sx={{ 
+              fontSize: "1.0625rem",
+              color: "#666666",
+              lineHeight: 1.6
+            }}
+          >
+            Create and manage user accounts.
+          </Typography>
+        </Box>
+        <Button 
+          variant="contained" 
+          onClick={() => setCreateDialogOpen(true)}
+          sx={{
+            minHeight: "44px",
+            borderRadius: 2,
+            fontSize: "0.9375rem",
+            fontWeight: 600,
+            textTransform: "none",
+            boxShadow: "none",
+            "&:hover": {
+              boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)"
+            }
+          }}
+        >
           Create User
         </Button>
       </Box>
@@ -196,33 +228,100 @@ export default function AdminUsersPage() {
         </Alert>
       )}
 
-      <TableContainer component={Paper}>
+      <TableContainer 
+        component={Paper} 
+        elevation={0}
+        sx={{ 
+          border: "1px solid #E5E5E5",
+          borderRadius: 2,
+          overflow: "hidden"
+        }}
+      >
         <Table>
           <TableHead>
-            <TableRow>
-              <TableCell>Email</TableCell>
-              <TableCell>Display Name</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Last Login</TableCell>
-              <TableCell>Created At</TableCell>
-              <TableCell align="right">Actions</TableCell>
+            <TableRow sx={{ bgcolor: "#FAFAFA" }}>
+              <TableCell sx={{ 
+                textTransform: "uppercase",
+                letterSpacing: "0.0625rem",
+                fontWeight: 500,
+                color: "#999999",
+                fontSize: "0.75rem",
+                py: 2
+              }}>Email</TableCell>
+              <TableCell sx={{ 
+                textTransform: "uppercase",
+                letterSpacing: "0.0625rem",
+                fontWeight: 500,
+                color: "#999999",
+                fontSize: "0.75rem",
+                py: 2
+              }}>Display Name</TableCell>
+              <TableCell sx={{ 
+                textTransform: "uppercase",
+                letterSpacing: "0.0625rem",
+                fontWeight: 500,
+                color: "#999999",
+                fontSize: "0.75rem",
+                py: 2
+              }}>Role</TableCell>
+              <TableCell sx={{ 
+                textTransform: "uppercase",
+                letterSpacing: "0.0625rem",
+                fontWeight: 500,
+                color: "#999999",
+                fontSize: "0.75rem",
+                py: 2
+              }}>Last Login</TableCell>
+              <TableCell sx={{ 
+                textTransform: "uppercase",
+                letterSpacing: "0.0625rem",
+                fontWeight: 500,
+                color: "#999999",
+                fontSize: "0.75rem",
+                py: 2
+              }}>Created At</TableCell>
+              <TableCell align="right" sx={{ 
+                textTransform: "uppercase",
+                letterSpacing: "0.0625rem",
+                fontWeight: 500,
+                color: "#999999",
+                fontSize: "0.75rem",
+                py: 2
+              }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user.firebase_uid}>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.display_name || "-"}</TableCell>
-                <TableCell>
+              <TableRow key={user.firebase_uid} sx={{ 
+                "&:hover": { bgcolor: "#FAFAFA" },
+                "&:last-child td": { borderBottom: 0 }
+              }}>
+                <TableCell sx={{ fontSize: "0.9375rem", color: "#1A1A1A", py: 2.5 }}>
+                  {user.email}
+                </TableCell>
+                <TableCell sx={{ fontSize: "0.9375rem", color: "#1A1A1A", py: 2.5 }}>
+                  {user.display_name || "-"}
+                </TableCell>
+                <TableCell sx={{ py: 2.5 }}>
                   <Chip
                     label={user.is_admin ? "Admin" : "User"}
-                    color={user.is_admin ? "primary" : "default"}
                     size="small"
+                    sx={{
+                      bgcolor: user.is_admin ? "primary.main" : "#F5F5F5",
+                      color: user.is_admin ? "white" : "#666666",
+                      fontSize: "0.75rem",
+                      fontWeight: 500,
+                      height: "24px"
+                    }}
                   />
                 </TableCell>
-                <TableCell>{formatDate(user.last_login)}</TableCell>
-                <TableCell>{formatDate(user.created_at)}</TableCell>
-                <TableCell align="right">
+                <TableCell sx={{ fontSize: "0.9375rem", color: "#666666", py: 2.5 }}>
+                  {formatDate(user.last_login)}
+                </TableCell>
+                <TableCell sx={{ fontSize: "0.9375rem", color: "#666666", py: 2.5 }}>
+                  {formatDate(user.created_at)}
+                </TableCell>
+                <TableCell align="right" sx={{ py: 2.5 }}>
                   <IconButton
                     size="small"
                     onClick={() => {
@@ -230,17 +329,24 @@ export default function AdminUsersPage() {
                       setResetDialogOpen(true);
                     }}
                     title="Send password reset email"
+                    sx={{ 
+                      color: "#666666",
+                      "&:hover": { bgcolor: "#F5F5F5" }
+                    }}
                   >
                     <VpnKeyIcon />
                   </IconButton>
                   <IconButton
                     size="small"
-                    color="error"
                     onClick={() => {
                       setUserToDelete(user);
                       setDeleteDialogOpen(true);
                     }}
                     title="Delete user"
+                    sx={{ 
+                      color: "error.main",
+                      "&:hover": { bgcolor: "error.lighter" }
+                    }}
                   >
                     <DeleteIcon />
                   </IconButton>
@@ -249,7 +355,7 @@ export default function AdminUsersPage() {
             ))}
             {users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={6} align="center" sx={{ py: 4, color: "#999999" }}>
                   No users found
                 </TableCell>
               </TableRow>
@@ -301,11 +407,31 @@ export default function AdminUsersPage() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)} disabled={creating}>
+          <Button 
+            onClick={() => setCreateDialogOpen(false)} 
+            disabled={creating}
+            sx={{
+              minHeight: "44px",
+              color: "#666666",
+              "&:hover": {
+                bgcolor: "#F5F5F5"
+              }
+            }}
+          >
             Cancel
           </Button>
-          <Button onClick={handleCreateUser} variant="contained" disabled={creating}>
-            {creating ? <CircularProgress size={24} /> : "Create"}
+          <Button 
+            onClick={handleCreateUser} 
+            disabled={creating}
+            sx={{
+              minHeight: "44px",
+              color: "#666666",
+              "&:hover": {
+                bgcolor: "#F5F5F5"
+              }
+            }}
+          >
+            {creating ? <CircularProgress size={20} /> : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -319,11 +445,31 @@ export default function AdminUsersPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+          <Button 
+            onClick={() => setDeleteDialogOpen(false)} 
+            disabled={deleting}
+            sx={{
+              minHeight: "44px",
+              color: "#666666",
+              "&:hover": {
+                bgcolor: "#F5F5F5"
+              }
+            }}
+          >
             Cancel
           </Button>
-          <Button onClick={handleDeleteUser} color="error" variant="contained" disabled={deleting}>
-            {deleting ? <CircularProgress size={24} /> : "Delete"}
+          <Button 
+            onClick={handleDeleteUser} 
+            disabled={deleting}
+            sx={{
+              minHeight: "44px",
+              color: "#666666",
+              "&:hover": {
+                bgcolor: "#F5F5F5"
+              }
+            }}
+          >
+            {deleting ? <CircularProgress size={20} /> : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -337,14 +483,34 @@ export default function AdminUsersPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setResetDialogOpen(false)} disabled={resetting}>
+          <Button 
+            onClick={() => setResetDialogOpen(false)} 
+            disabled={resetting}
+            sx={{
+              minHeight: "44px",
+              color: "#666666",
+              "&:hover": {
+                bgcolor: "#F5F5F5"
+              }
+            }}
+          >
             Cancel
           </Button>
-          <Button onClick={handleResetPassword} variant="contained" disabled={resetting}>
-            {resetting ? <CircularProgress size={24} /> : "Send Reset Email"}
+          <Button 
+            onClick={handleResetPassword} 
+            disabled={resetting}
+            sx={{
+              minHeight: "44px",
+              color: "#666666",
+              "&:hover": {
+                bgcolor: "#F5F5F5"
+              }
+            }}
+          >
+            {resetting ? <CircularProgress size={20} /> : "Send Reset Email"}
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </Box>
   );
 }

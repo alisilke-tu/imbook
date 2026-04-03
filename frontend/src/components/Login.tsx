@@ -39,7 +39,7 @@ const Login = () => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        bgcolor: "background.paper",
+        bgcolor: "white",
         py: 8,
       }}
     >
@@ -50,12 +50,15 @@ const Login = () => {
           px: 3,
         }}
       >
-        <Stack spacing={3}>
+        <Stack spacing={4}>
           <Typography
             variant="h2"
             component="h1"
             sx={{
-              fontSize: "2rem",
+              fontSize: { xs: "2rem", md: "2.625rem" },
+              fontWeight: 700,
+              color: "black",
+              letterSpacing: "-0.03125rem",
               textAlign: "center",
             }}
           >
@@ -68,16 +71,18 @@ const Login = () => {
             </Alert>
           )}
 
-          <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Box component="form" sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <Box>
               <Typography
                 component="label"
                 htmlFor="loginEmail"
                 sx={{
-                  fontSize: "0.875rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.0625rem",
                   fontWeight: 500,
-                  color: "text.secondary",
-                  mb: 1,
+                  color: "#999999",
+                  fontSize: "0.75rem",
+                  mb: 1.5,
                   display: "block",
                 }}
               >
@@ -92,9 +97,27 @@ const Login = () => {
                 fullWidth
                 required
                 sx={{
-                  "& .MuiInputBase-root": {
-                    height: "56px",
+                  "& .MuiOutlinedInput-root": {
+                    bgcolor: "white",
+                    border: "1px solid #E5E5E5",
+                    borderRadius: 2,
+                    minHeight: "56px",
+                    fontSize: "1.0625rem",
+                    px: 2.5,
+                    "& fieldset": {
+                      border: "none"
+                    },
+                    "&:hover": {
+                      borderColor: "primary.main"
+                    },
+                    "&.Mui-focused": {
+                      borderColor: "primary.main"
+                    }
                   },
+                  "& .MuiInputBase-input::placeholder": {
+                    color: "#999999",
+                    opacity: 1
+                  }
                 }}
               />
             </Box>
@@ -104,10 +127,12 @@ const Login = () => {
                 component="label"
                 htmlFor="loginPassword"
                 sx={{
-                  fontSize: "0.875rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.0625rem",
                   fontWeight: 500,
-                  color: "text.secondary",
-                  mb: 1,
+                  color: "#999999",
+                  fontSize: "0.75rem",
+                  mb: 1.5,
                   display: "block",
                 }}
               >
@@ -122,9 +147,27 @@ const Login = () => {
                 fullWidth
                 required
                 sx={{
-                  "& .MuiInputBase-root": {
-                    height: "56px",
+                  "& .MuiOutlinedInput-root": {
+                    bgcolor: "white",
+                    border: "1px solid #E5E5E5",
+                    borderRadius: 2,
+                    minHeight: "56px",
+                    fontSize: "1.0625rem",
+                    px: 2.5,
+                    "& fieldset": {
+                      border: "none"
+                    },
+                    "&:hover": {
+                      borderColor: "primary.main"
+                    },
+                    "&.Mui-focused": {
+                      borderColor: "primary.main"
+                    }
                   },
+                  "& .MuiInputBase-input::placeholder": {
+                    color: "#999999",
+                    opacity: 1
+                  }
                 }}
               />
             </Box>
@@ -136,8 +179,15 @@ const Login = () => {
               onClick={loginWithUsernameAndPassword}
               sx={{
                 mt: 2,
-                minHeight: "56px",
-                fontSize: "1.0625rem",
+                minHeight: "44px",
+                borderRadius: 2,
+                fontSize: "0.9375rem",
+                fontWeight: 600,
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": {
+                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)"
+                }
               }}
             >
               Login

@@ -1,24 +1,59 @@
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
-import { Box, Container, Tab, Tabs, Typography } from "@mui/material";
+import { Box, Container, Link } from "@mui/material";
 
 export default function AdminLayout() {
   const location = useLocation();
   const path = location.pathname;
-  const value = path.includes("/settings") ? 3 : path.includes("/roadmap") ? 2 : path.includes("/users") ? 1 : 0;
+
+  const sections = [
+    {
+      label: "Datasets",
+      path: "/admin/datasets",
+      isActive: (p: string) => p.startsWith("/admin/datasets"),
+    },
+    { label: "Pipelines", path: "/admin/pipelines", isActive: (p: string) => p.startsWith("/admin/pipelines") },
+    { label: "Chats", path: "/admin/chats", isActive: (p: string) => p.startsWith("/admin/chats") },
+    { label: "Users", path: "/admin/users", isActive: (p: string) => p.startsWith("/admin/users") },
+  ];
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Admin
-      </Typography>
-      <Tabs value={value} sx={{ mb: 3 }}>
-        <Tab label="ETL-Pipeline" component={RouterLink} to="/admin-dashboard/etl-pipeline" />
-        <Tab label="Users" component={RouterLink} to="/admin-dashboard/users" />
-        <Tab label="Roadmap" component={RouterLink} to="/admin-dashboard/roadmap" />
-        <Tab label="Settings" component={RouterLink} to="/admin-dashboard/settings" />
-      </Tabs>
-      <Box>
-        <Outlet />
+      <Box sx={{ display: "flex", gap: 4 }}>
+        <Box
+          sx={{
+            width: 150,
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          {sections.map((section) => {
+            const isActive = section.isActive(path);
+            return (
+              <Link
+                key={section.path}
+                component={RouterLink}
+                to={section.path}
+                underline="none"
+                sx={{
+                  fontSize: "0.9375rem",
+                  fontWeight: 400,
+                  color: isActive ? "primary.main" : "text.primary",
+                  textDecoration: isActive ? "underline" : "none",
+                  "&:hover": {
+                    color: "primary.main",
+                  },
+                }}
+              >
+                {section.label}
+              </Link>
+            );
+          })}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Outlet />
+        </Box>
       </Box>
     </Container>
   );

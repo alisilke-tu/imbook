@@ -36,7 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected := result.RowsAffected()
 	if rowsAffected == 0 {
 		fmt.Printf("No user found with UID or email: %s\n", identifier)
 		fmt.Println("Make sure the user has logged in at least once to be created in the database.")
