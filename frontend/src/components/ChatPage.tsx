@@ -351,7 +351,6 @@ export default function ChatPage() {
   const [sessionTree, setSessionTree] = useState<SessionWithConversations[]>([]);
   const [activeSession, setActiveSession] = useState<LearningSession | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [viewingHistory, setViewingHistory] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
 
@@ -431,36 +430,10 @@ export default function ChatPage() {
         const data = (await res.json()) as { session: LearningSession };
         setActiveSession(data.session);
         setSelectedSessionId(sessionId);
-        setSelectedExecutionId(null);
         setViewingHistory(false);
         setMessages([]);
         await loadLearningData();
       }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleSelectConversation = async (sessionId: string, executionId: string) => {
-    const token = await auth?.currentUser?.getIdToken();
-    if (!token) return;
-    try {
-      const res = await fetch(
-        `${API_URL}/learning/sessions/${sessionId}/conversations/${executionId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        messages: { role: string; text: string }[];
-      };
-      const msgs: Message[] = data.messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        text: m.text,
-      }));
-      setMessages(msgs);
-      setSelectedSessionId(sessionId);
-      setSelectedExecutionId(executionId);
-      setViewingHistory(true);
     } catch (e) {
       console.error(e);
     }
@@ -475,7 +448,6 @@ export default function ChatPage() {
     setSessionTree((prev) => prev.filter((s) => s.session.id !== sessionId));
     if (selectedSessionId === sessionId) {
       setSelectedSessionId(null);
-      setSelectedExecutionId(null);
       setActiveSession(null);
       setMessages([]);
       setViewingHistory(false);
@@ -500,7 +472,6 @@ export default function ChatPage() {
 
   const startNewChat = () => {
     setViewingHistory(false);
-    setSelectedExecutionId(null);
     setMessages([]);
   };
 
@@ -758,7 +729,6 @@ export default function ChatPage() {
         onCreated={async (session) => {
           setActiveSession(session);
           setSelectedSessionId(session.id);
-          setSelectedExecutionId(null);
           setViewingHistory(false);
           await loadLearningData();
         }}
