@@ -1,5 +1,5 @@
 {
-	"id": "krcmar-v3-qie2",
+	"id": "imbook-cmk2",
 	"global_cors": {
 		"allow_origins_with_credentials": [
 			"http://localhost:5173",
