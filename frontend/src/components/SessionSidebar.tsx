@@ -10,6 +10,7 @@ import {
   useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useState } from "react";
@@ -35,6 +36,7 @@ type Props = {
   onNewSession: () => void;
   onSelectSession: (sessionId: string) => void;
   onSelectConversation: (sessionId: string, executionId: string) => void;
+  onDeleteSession: (sessionId: string) => void;
 };
 
 function formatTime(iso: string) {
@@ -54,10 +56,12 @@ export default function SessionSidebar({
   onNewSession,
   onSelectSession,
   onSelectConversation,
+  onDeleteSession,
 }: Props) {
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down("md"));
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
 
   const toggle = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -140,7 +144,11 @@ export default function SessionSidebar({
           const sessionSelected = selectedSessionId === session.id && !selectedExecutionId;
           const isActive = activeSessionId === session.id;
           return (
-            <Box key={session.id}>
+            <Box
+              key={session.id}
+              onMouseEnter={() => setHoveredSessionId(session.id)}
+              onMouseLeave={() => setHoveredSessionId(null)}
+            >
               <ListItemButton
                 onClick={() => {
                   toggle(session.id);
@@ -176,6 +184,20 @@ export default function SessionSidebar({
                     <ChevronRightIcon sx={{ fontSize: 16 }} />
                   )}
                 </IconButton>
+                {hoveredSessionId === session.id && (
+                  <IconButton
+                    size="small"
+                    tabIndex={-1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSession(session.id);
+                    }}
+                    sx={{ p: 0.25, mr: 0.25, color: "#CCCCCC", "&:hover": { color: "#e53935" } }}
+                    aria-label="Delete session"
+                  >
+                    <DeleteIcon sx={{ fontSize: 15 }} />
+                  </IconButton>
+                )}
                 <ListItemText
                   primary={
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>

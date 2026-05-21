@@ -399,6 +399,45 @@ func SetActiveSession(ctx context.Context, id string) (*SetActiveSessionResponse
 	return &SetActiveSessionResponse{Session: s}, nil
 }
 
+// DeleteLearningSessionResponse confirms deletion.
+type DeleteLearningSessionResponse struct {
+	OK bool `json:"ok"`
+}
+
+// DeleteLearningSession deletes a session owned by the current user and unlinks its conversations.
+//
+//encore:api auth method=DELETE path=/learning/sessions/:id
+func DeleteLearningSession(ctx context.Context, id string) (*DeleteLearningSessionResponse, error) {
+	uid, _ := auth.UserID()
+
+	// Verify ownership
+	var count int
+	err := db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM learning_sessions WHERE id = $1 AND user_id = $2
+	`, id, string(uid)).Scan(&count)
+	if err != nil || count == 0 {
+		return nil, &errs.Error{Code: errs.NotFound, Message: "session not found"}
+	}
+
+	// Unlink pipeline executions from this session
+	_, err = pipelineDB.Exec(ctx, `
+		UPDATE pipeline_executions SET learning_session_id = NULL WHERE learning_session_id = $1::uuid
+	`, id)
+	if err != nil {
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to unlink conversations"}
+	}
+
+	// Delete the session
+	_, err = db.Exec(ctx, `
+		DELETE FROM learning_sessions WHERE id = $1 AND user_id = $2
+	`, id, string(uid))
+	if err != nil {
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to delete session"}
+	}
+
+	return &DeleteLearningSessionResponse{OK: true}, nil
+}
+
 // GetCurrentSessionContextParams is used by agents (private API).
 type GetCurrentSessionContextParams struct {
 	UserID string `json:"user_id"`

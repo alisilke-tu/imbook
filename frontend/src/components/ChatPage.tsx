@@ -466,6 +466,27 @@ export default function ChatPage() {
     }
   };
 
+  const handleDeleteSession = async (sessionId: string) => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token) return;
+    try {
+      await fetch(`${API_URL}/learning/sessions/${sessionId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (selectedSessionId === sessionId) {
+        setSelectedSessionId(null);
+        setSelectedExecutionId(null);
+        setActiveSession(null);
+        setMessages([]);
+        setViewingHistory(false);
+      }
+      await loadLearningData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const startNewChat = () => {
     setViewingHistory(false);
     setSelectedExecutionId(null);
@@ -739,6 +760,7 @@ export default function ChatPage() {
         onNewSession={() => setSessionDialogOpen(true)}
         onSelectSession={handleSelectSession}
         onSelectConversation={handleSelectConversation}
+        onDeleteSession={handleDeleteSession}
       />
       <Box sx={{ flex: 1, minWidth: 0 }}>
       <Container maxWidth="md" sx={{ py: { xs: 4, md: 7.5 }, px: { xs: 3, md: 5 } }}>
