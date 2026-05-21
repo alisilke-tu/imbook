@@ -6,7 +6,12 @@ import Client, { Local } from "./client.ts";
  * backend is also running locally.
  */
 const getRequestClient = (token: string | undefined) => {
-  const apiUrl = import.meta.env.VITE_API_URL || Local;
+  let apiUrl: string = import.meta.env.VITE_API_URL || Local;
+
+  // Support relative URLs (e.g. /api) for Vercel proxy setups
+  if (apiUrl.startsWith('/')) {
+    apiUrl = window.location.origin + apiUrl;
+  }
 
   return new Client(apiUrl, {
     auth: token,
