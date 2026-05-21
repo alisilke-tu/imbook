@@ -767,10 +767,8 @@ export default function ChatPage() {
         sessions={sessionTree}
         activeSessionId={activeSession?.id ?? null}
         selectedSessionId={selectedSessionId}
-        selectedExecutionId={selectedExecutionId}
         onNewSession={() => setSessionDialogOpen(true)}
         onSelectSession={handleSelectSession}
-        onSelectConversation={handleSelectConversation}
         onDeleteSession={handleDeleteSession}
       />
       <Box sx={{ flex: 1, minWidth: 0 }}>

@@ -1,6 +1,5 @@
 import {
   Box,
-  Collapse,
   IconButton,
   List,
   ListItemButton,
@@ -11,8 +10,6 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import { useState } from "react";
 import type { LearningSession } from "./LearningSessionDialog.tsx";
 
@@ -32,40 +29,23 @@ type Props = {
   sessions: SessionWithConversations[];
   activeSessionId: string | null;
   selectedSessionId: string | null;
-  selectedExecutionId: string | null;
   onNewSession: () => void;
   onSelectSession: (sessionId: string) => void;
-  onSelectConversation: (sessionId: string, executionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 };
 
-function formatTime(iso: string) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  } catch {
-    return "";
-  }
-}
 
 export default function SessionSidebar({
   sessions,
   activeSessionId,
   selectedSessionId,
-  selectedExecutionId,
   onNewSession,
   onSelectSession,
-  onSelectConversation,
   onDeleteSession,
 }: Props) {
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down("md"));
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
-
-  const toggle = (id: string) => {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
 
   return (
     <Box
@@ -139,9 +119,8 @@ export default function SessionSidebar({
             </Typography>
           </Box>
         )}
-        {sessions.map(({ session, conversations }) => {
-          const isOpen = expanded[session.id] ?? true;
-          const sessionSelected = selectedSessionId === session.id && !selectedExecutionId;
+        {sessions.map(({ session }) => {
+          const sessionSelected = selectedSessionId === session.id;
           const isActive = activeSessionId === session.id;
           return (
             <Box
@@ -150,14 +129,11 @@ export default function SessionSidebar({
               onMouseLeave={() => setHoveredSessionId(null)}
             >
               <ListItemButton
-                onClick={() => {
-                  toggle(session.id);
-                  onSelectSession(session.id);
-                }}
+                onClick={() => onSelectSession(session.id)}
                 selected={sessionSelected}
                 sx={{
                   py: 0.75,
-                  pl: 1,
+                  pl: 1.5,
                   pr: 1.5,
                   minHeight: 40,
                   borderLeft: "2px solid",
@@ -169,21 +145,6 @@ export default function SessionSidebar({
                   "&:hover": { bgcolor: "rgba(0,0,0,0.02)" },
                 }}
               >
-                <IconButton
-                  size="small"
-                  tabIndex={-1}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggle(session.id);
-                  }}
-                  sx={{ p: 0.25, mr: 0.5, color: "#BBBBBB" }}
-                >
-                  {isOpen ? (
-                    <ExpandMoreIcon sx={{ fontSize: 16 }} />
-                  ) : (
-                    <ChevronRightIcon sx={{ fontSize: 16 }} />
-                  )}
-                </IconButton>
                 {hoveredSessionId === session.id && (
                   <IconButton
                     size="small"
@@ -229,58 +190,6 @@ export default function SessionSidebar({
                   }
                 />
               </ListItemButton>
-              <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
-                  {conversations.map((c) => {
-                    const convSelected = selectedExecutionId === c.execution_id;
-                    return (
-                      <ListItemButton
-                        key={c.execution_id}
-                        onClick={() => onSelectConversation(session.id, c.execution_id)}
-                        selected={convSelected}
-                        sx={{
-                          py: 0.5,
-                          pl: 3.5,
-                          pr: 1.5,
-                          minHeight: 34,
-                          borderLeft: "2px solid",
-                          borderLeftColor: convSelected ? "primary.main" : "transparent",
-                          "&.Mui-selected": {
-                            bgcolor: "rgba(0,0,0,0.03)",
-                            "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
-                          },
-                        }}
-                      >
-                        <ListItemText
-                          primary={c.preview}
-                          secondary={formatTime(c.created_at)}
-                          primaryTypographyProps={{
-                            variant: "body2",
-                            noWrap: true,
-                            sx: { fontSize: "0.75rem", color: "#555555", lineHeight: 1.35 },
-                          }}
-                          secondaryTypographyProps={{
-                            sx: { fontSize: "0.65rem", color: "#AAAAAA", mt: 0.15 },
-                          }}
-                        />
-                      </ListItemButton>
-                    );
-                  })}
-                  {conversations.length === 0 && (
-                    <Typography
-                      sx={{
-                        pl: 3.5,
-                        pr: 2,
-                        py: 0.75,
-                        fontSize: "0.6875rem",
-                        color: "#BBBBBB",
-                      }}
-                    >
-                      No chats
-                    </Typography>
-                  )}
-                </List>
-              </Collapse>
             </Box>
           );
         })}
