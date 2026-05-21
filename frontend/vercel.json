@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://production-krcmar-v3-qie2.encr.app/:path*"
+      "destination": "https://staging-imbook-cmk2.encr.app/:path*"
     },
     {
       "source": "/(.*)",
