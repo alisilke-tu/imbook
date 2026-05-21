@@ -201,9 +201,7 @@ func Chat(ctx context.Context, params *ChatParams) (*ChatResponse, error) {
 		rlog.Error("failed to create llm", "err", err)
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to create model"}
 	}
-	// TODO: Get default_dataset_id from user settings
-	// For now, search tool will return a message that it's not configured
-	searchTool := &searchChunksTool{userID: string(uid), datasetID: ""}
+	searchTool := &searchChunksTool{userID: string(uid), datasetID: apiKeyResp.DefaultDatasetID}
 	agentTools := []tools.Tool{searchTool}
 	agent := agents.NewOneShotAgent(llm, agentTools)
 	executor := agents.NewExecutor(agent, agents.WithReturnIntermediateSteps())
@@ -282,9 +280,7 @@ func ChatStream(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	streamCb := &streamingCallbacks{w: sse}
-	// TODO: Get default_dataset_id from user settings
-	// For now, search tool will return a message that it's not configured
-	searchTool := &searchChunksTool{userID: string(uid), datasetID: ""}
+	searchTool := &searchChunksTool{userID: string(uid), datasetID: apiKeyResp.DefaultDatasetID}
 	agentTools := []tools.Tool{searchTool}
 	agent := agents.NewOneShotAgent(llm, agentTools)
 	executor := agents.NewExecutor(agent, agents.WithReturnIntermediateSteps(), agents.WithCallbacksHandler(streamCb))

@@ -22,7 +22,8 @@ var db = sqldb.NewDatabase("settings", sqldb.DatabaseConfig{
 // GetResponse is returned by Get (never includes the raw API key).
 // gemini_api_key in DB is reused for OpenRouter API key.
 type GetResponse struct {
-	GeminiAPIKeySet bool `json:"gemini_api_key_set"`
+	GeminiAPIKeySet  bool   `json:"gemini_api_key_set"`
+	DefaultDatasetID string `json:"default_dataset_id"`
 }
 
 // Get returns the current user's settings (masked). Requires authentication.
@@ -30,20 +31,21 @@ type GetResponse struct {
 //encore:api auth method=GET path=/settings
 func Get(ctx context.Context) (*GetResponse, error) {
 	uid, _ := auth.UserID()
-	var key string
-	err := db.QueryRow(ctx, `SELECT gemini_api_key FROM user_settings WHERE user_id = $1`, string(uid)).Scan(&key)
+	var key, datasetID string
+	err := db.QueryRow(ctx, `SELECT gemini_api_key, default_dataset_id FROM user_settings WHERE user_id = $1`, string(uid)).Scan(&key, &datasetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return &GetResponse{GeminiAPIKeySet: false}, nil
 		}
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to fetch settings"}
 	}
-	return &GetResponse{GeminiAPIKeySet: key != ""}, nil
+	return &GetResponse{GeminiAPIKeySet: key != "", DefaultDatasetID: datasetID}, nil
 }
 
 // SetParams are the parameters for updating settings.
 type SetParams struct {
-	GeminiAPIKey string `json:"gemini_api_key"`
+	GeminiAPIKey     string `json:"gemini_api_key"`
+	DefaultDatasetID string `json:"default_dataset_id"`
 }
 
 // Set updates the current user's settings (e.g. OpenRouter API key). Requires authentication.
@@ -51,14 +53,16 @@ type SetParams struct {
 //encore:api auth method=POST path=/settings
 func Set(ctx context.Context, params *SetParams) error {
 	uid, _ := auth.UserID()
-	if params == nil || params.GeminiAPIKey == "" {
+	if params == nil || (params.GeminiAPIKey == "" && params.DefaultDatasetID == "") {
 		return &errs.Error{Code: errs.InvalidArgument, Message: "OpenRouter API key is required"}
 	}
 	_, err := db.Exec(ctx, `
-		INSERT INTO user_settings (user_id, gemini_api_key)
-		VALUES ($1, $2)
-		ON CONFLICT (user_id) DO UPDATE SET gemini_api_key = EXCLUDED.gemini_api_key
-	`, string(uid), params.GeminiAPIKey)
+		INSERT INTO user_settings (user_id, gemini_api_key, default_dataset_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id) DO UPDATE
+			SET gemini_api_key = CASE WHEN EXCLUDED.gemini_api_key != '' THEN EXCLUDED.gemini_api_key ELSE user_settings.gemini_api_key END,
+			    default_dataset_id = CASE WHEN EXCLUDED.default_dataset_id != '' THEN EXCLUDED.default_dataset_id ELSE user_settings.default_dataset_id END
+	`, string(uid), params.GeminiAPIKey, params.DefaultDatasetID)
 	if err != nil {
 		return &errs.Error{Code: errs.Internal, Message: "failed to save settings"}
 	}
@@ -72,7 +76,8 @@ type GetGeminiKeyParams struct {
 
 // GetGeminiKeyResponse is returned by GetGeminiKey (private API).
 type GetGeminiKeyResponse struct {
-	Key string `json:"key"`
+	Key              string `json:"key"`
+	DefaultDatasetID string `json:"default_dataset_id"`
 }
 
 // GetGeminiKey returns the OpenRouter API key for the given user (stored in gemini_api_key column). Private; used by content and chat.
@@ -82,8 +87,8 @@ func GetGeminiKey(ctx context.Context, params *GetGeminiKeyParams) (*GetGeminiKe
 	if params == nil || params.UserID == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "userID is required"}
 	}
-	var key string
-	err := db.QueryRow(ctx, `SELECT gemini_api_key FROM user_settings WHERE user_id = $1`, params.UserID).Scan(&key)
+	var key, datasetID string
+	err := db.QueryRow(ctx, `SELECT gemini_api_key, default_dataset_id FROM user_settings WHERE user_id = $1`, params.UserID).Scan(&key, &datasetID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &errs.Error{Code: errs.NotFound, Message: "OpenRouter API key not set. Set it in Settings."}
@@ -93,7 +98,7 @@ func GetGeminiKey(ctx context.Context, params *GetGeminiKeyParams) (*GetGeminiKe
 	if key == "" {
 		return nil, &errs.Error{Code: errs.NotFound, Message: "OpenRouter API key not set. Set it in Settings."}
 	}
-	return &GetGeminiKeyResponse{Key: key}, nil
+	return &GetGeminiKeyResponse{Key: key, DefaultDatasetID: datasetID}, nil
 }
 
 // BillingResponse is returned by Billing (OpenRouter credits/usage).
