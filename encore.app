@@ -7,6 +7,6 @@
 			"https://krcmar-v3.vercel.app",
 			"https://imbook-ruby.vercel.app"
 		],
-		"allow_headers": ["Authorization", "Content-Type"]
+		"allow_headers": ["*"]
 	}
 }
