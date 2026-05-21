@@ -469,20 +469,31 @@ export default function ChatPage() {
   const handleDeleteSession = async (sessionId: string) => {
     const token = await auth?.currentUser?.getIdToken();
     if (!token) return;
+
+    // Optimistic update: remove from UI immediately
+    const previous = sessionTree;
+    setSessionTree((prev) => prev.filter((s) => s.session.id !== sessionId));
+    if (selectedSessionId === sessionId) {
+      setSelectedSessionId(null);
+      setSelectedExecutionId(null);
+      setActiveSession(null);
+      setMessages([]);
+      setViewingHistory(false);
+    }
+
     try {
-      await fetch(`${API_URL}/learning/sessions/${sessionId}`, {
+      const res = await fetch(`${API_URL}/learning/sessions/${sessionId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (selectedSessionId === sessionId) {
-        setSelectedSessionId(null);
-        setSelectedExecutionId(null);
-        setActiveSession(null);
-        setMessages([]);
-        setViewingHistory(false);
+      if (!res.ok) {
+        // Rollback on failure
+        setSessionTree(previous);
+        console.error("Delete failed:", await res.text());
       }
-      await loadLearningData();
     } catch (e) {
+      // Rollback on failure
+      setSessionTree(previous);
       console.error(e);
     }
   };
