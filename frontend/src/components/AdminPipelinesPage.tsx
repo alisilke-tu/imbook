@@ -265,27 +265,25 @@ export default function AdminPipelinesPage() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1.5 }}>
-          {tabValue === 0 && configs.length === 0 && (
-            <Button 
-              variant="outlined" 
-              onClick={handleSeed}
-              sx={{
-                minHeight: "44px",
-                borderRadius: 2,
-                fontSize: "0.9375rem",
-                fontWeight: 600,
-                textTransform: "none",
-                borderColor: "#E5E5E5",
-                color: "#666666",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  bgcolor: "transparent"
-                }
-              }}
-            >
-              Seed Default Configs & Workflows
-            </Button>
-          )}
+          <Button 
+            variant="outlined" 
+            onClick={handleSeed}
+            sx={{
+              minHeight: "44px",
+              borderRadius: 2,
+              fontSize: "0.9375rem",
+              fontWeight: 600,
+              textTransform: "none",
+              borderColor: "#E5E5E5",
+              color: "#666666",
+              "&:hover": {
+                borderColor: "primary.main",
+                bgcolor: "transparent"
+              }
+            }}
+          >
+            Seed Default Configs & Workflows
+          </Button>
           <Button 
             variant="contained" 
             startIcon={tabValue === 0 ? <AddIcon /> : <AccountTreeIcon />}
