@@ -22,6 +22,11 @@ import SessionSidebar, { type SessionWithConversations } from "./SessionSidebar.
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
+const HIDDEN_WORKFLOW_NAMES = new Set([
+  "MAS (Book first + Fallback)",
+  "Precise Researcher",
+]);
+
 type ChatStep = {
   tool: string;
   tool_input: string;
@@ -428,7 +433,8 @@ export default function ChatPage() {
 
         if (res.ok) {
           const data = await res.json();
-          const list: Workflow[] = data.pipelines || [];
+          const all: Workflow[] = data.pipelines || [];
+          const list = all.filter((wf) => !HIDDEN_WORKFLOW_NAMES.has(wf.name));
           setWorkflows(list);
           if (list.length > 0) {
             setSelectedWorkflow(list[0].id);

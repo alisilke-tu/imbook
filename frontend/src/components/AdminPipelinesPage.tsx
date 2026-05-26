@@ -21,6 +21,11 @@ import { FirebaseContext } from "../lib/firebase.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
+const HIDDEN_WORKFLOW_NAMES = new Set([
+  "MAS (Book first + Fallback)",
+  "Precise Researcher",
+]);
+
 type AgentConfig = {
   id: string;
   name: string;
@@ -89,7 +94,8 @@ export default function AdminPipelinesPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setPipelines(data.pipelines || []);
+        const list: Pipeline[] = data.pipelines || [];
+        setPipelines(list.filter((p) => !HIDDEN_WORKFLOW_NAMES.has(p.name)));
       } else {
         setError("Failed to fetch pipelines");
       }
@@ -174,6 +180,26 @@ export default function AdminPipelinesPage() {
     navigate("/admin/pipelines/configurator?new=true");
   };
 
+  const handleSeed = async () => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_URL}/pipelines/seed`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        fetchConfigs();
+      } else {
+        setError("Failed to seed configurations");
+      }
+    } catch (err) {
+      setError("Failed to seed configurations");
+    }
+  };
+
   const handleDeletePipeline = async (id: string) => {
     if (!confirm("Are you sure you want to delete this workflow?")) return;
 
@@ -245,6 +271,27 @@ export default function AdminPipelinesPage() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1.5 }}>
+          {tabValue === 0 && configs.length === 0 && (
+            <Button 
+              variant="outlined" 
+              onClick={handleSeed}
+              sx={{
+                minHeight: "44px",
+                borderRadius: 2,
+                fontSize: "0.9375rem",
+                fontWeight: 600,
+                textTransform: "none",
+                borderColor: "#E5E5E5",
+                color: "#666666",
+                "&:hover": {
+                  borderColor: "primary.main",
+                  bgcolor: "transparent"
+                }
+              }}
+            >
+              Seed Default Configs
+            </Button>
+          )}
           <Button 
             variant="contained" 
             startIcon={tabValue === 0 ? <AddIcon /> : <AccountTreeIcon />}
