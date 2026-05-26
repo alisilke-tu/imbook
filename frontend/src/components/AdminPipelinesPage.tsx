@@ -46,6 +46,16 @@ type Pipeline = {
   updated_at: string;
 };
 
+type ConfigSummary = {
+  id: string;
+  name: string;
+};
+
+type DatasetSummary = {
+  id: string;
+  status: string;
+};
+
 export default function AdminPipelinesPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -179,19 +189,193 @@ export default function AdminPipelinesPage() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/pipelines/seed`, {
-        method: "POST",
+      setError(null);
+
+      const settingsRes = await fetch(`${API_URL}/settings`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        fetchConfigs();
-      } else {
-        setError((data as { message?: string })?.message ?? "Failed to seed configurations and workflows");
+      if (!settingsRes.ok) {
+        throw new Error("failed to load settings");
       }
+      const settingsData = await settingsRes.json();
+
+      let datasetId = settingsData.default_dataset_id || "";
+      if (!datasetId) {
+        const datasetsRes = await fetch(`${API_URL}/content/datasets?status=ready`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!datasetsRes.ok) {
+          throw new Error("failed to load ready datasets");
+        }
+        const datasetsData = await datasetsRes.json();
+        const datasets = (datasetsData.datasets || []) as DatasetSummary[];
+        if (datasets.length === 0) {
+          throw new Error("No ready dataset found. Finish embedding one in the Content admin first.");
+        }
+        datasetId = datasets[0].id;
+      }
+
+      const configsRes = await fetch(`${API_URL}/pipelines/configs?include_disabled=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!configsRes.ok) {
+        throw new Error("failed to load existing agent configs");
+      }
+      const configsData = await configsRes.json();
+      const existingConfigs = new Map<string, string>();
+      for (const cfg of (configsData.configs || []) as ConfigSummary[]) {
+        existingConfigs.set(cfg.name, cfg.id);
+      }
+
+      const ensureConfig = async (payload: Record<string, unknown>) => {
+        const existingId = existingConfigs.get(String(payload.name));
+        if (existingId) return existingId;
+
+        const res = await fetch(`${API_URL}/pipelines/configs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error((data as { message?: string })?.message ?? `Failed to create agent config ${String(payload.name)}`);
+        }
+        const createdId = (data as { id?: string })?.id;
+        if (!createdId) {
+          throw new Error(`Config ${String(payload.name)} was created but no id was returned`);
+        }
+        existingConfigs.set(String(payload.name), createdId);
+        return createdId;
+      };
+
+      const strictConfigId = await ensureConfig({
+        name: "Strict Book Answerer",
+        description: "Answers only from book evidence with no outside knowledge",
+        system_prompt: `You answer only from the book content retrieved by search_chunks.
+
+Rules:
+- Always search the book first
+- Use only statements that are directly supported by retrieved passages
+- If nothing relevant is found, say clearly that the book does not provide a reliable answer
+- Do not add outside knowledge or speculation
+- Mention book evidence briefly and stay concise`,
+        model: "google/gemini-2.0-flash-001",
+        max_tokens: 3000,
+        temperature: 0.1,
+        tool_configs: [{ name: "search_chunks", dataset_id: datasetId }],
+        is_default: false,
+      });
+
+      const researchConfigId = await ensureConfig({
+        name: "Book Evidence Researcher",
+        description: "Extracts evidence from the book for a later synthesis step",
+        system_prompt: `You are the research step in a two-agent workflow.
+
+Task:
+- Search the book thoroughly for evidence relevant to the question
+- Return short bullet points with the most relevant passages and concepts
+- If you cannot find a meaningful match, output exactly: NO_EVIDENCE
+- Do not give a polished final answer
+- Do not use general knowledge as a substitute for evidence`,
+        model: "google/gemini-2.0-flash-001",
+        max_tokens: 3000,
+        temperature: 0.2,
+        tool_configs: [{ name: "search_chunks", dataset_id: datasetId }],
+        is_default: false,
+      });
+
+      const synthConfigId = await ensureConfig({
+        name: "General Knowledge Synthesizer",
+        description: "Final synthesis step that can fall back to domain knowledge",
+        system_prompt: `You are the final synthesis step in a two-agent workflow.
+
+You receive the original question plus the previous agent's evidence.
+
+Rules:
+- If the previous agent found book evidence, answer primarily from that evidence
+- If the previous agent says NO_EVIDENCE or the evidence is clearly insufficient, fall back to general knowledge in the same domain
+- Clearly mark when you are using general knowledge fallback
+- Keep the answer grounded in the topic of the book
+- Be explicit about whether the answer is book-based or fallback-based`,
+        model: "google/gemini-2.0-flash-001",
+        max_tokens: 3500,
+        temperature: 0.5,
+        tool_configs: [],
+        is_default: false,
+      });
+
+      const pipelinesRes = await fetch(`${API_URL}/pipelines/workflows`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!pipelinesRes.ok) {
+        throw new Error("failed to load existing workflows");
+      }
+      const pipelinesData = await pipelinesRes.json();
+      const existingPipelines = new Set<string>((pipelinesData.pipelines || []).map((p: Pipeline) => p.name));
+
+      const createWorkflow = async (payload: Record<string, unknown>) => {
+        if (existingPipelines.has(String(payload.name))) {
+          return;
+        }
+        const res = await fetch(`${API_URL}/pipelines/workflows`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error((data as { message?: string })?.message ?? `Failed to create workflow ${String(payload.name)}`);
+        }
+        existingPipelines.add(String(payload.name));
+      };
+
+      const strictStartId = crypto.randomUUID();
+      const strictAgentId = crypto.randomUUID();
+      const strictEndId = crypto.randomUUID();
+      await createWorkflow({
+        name: "Strict Book Workflow",
+        description: "Single-agent workflow that answers only from book evidence",
+        nodes: [
+          { id: strictStartId, node_type: "start", agent_config_id: null, position_x: 250, position_y: 50, config: null },
+          { id: strictAgentId, node_type: "agent", agent_config_id: strictConfigId, position_x: 250, position_y: 200, config: null },
+          { id: strictEndId, node_type: "end", agent_config_id: null, position_x: 250, position_y: 350, config: null },
+        ],
+        edges: [
+          { id: crypto.randomUUID(), source_node_id: strictStartId, target_node_id: strictAgentId, condition_type: null, condition_value: null, label: null },
+          { id: crypto.randomUUID(), source_node_id: strictAgentId, target_node_id: strictEndId, condition_type: null, condition_value: null, label: null },
+        ],
+      });
+
+      const researchStartId = crypto.randomUUID();
+      const researchAgentId = crypto.randomUUID();
+      const synthAgentId = crypto.randomUUID();
+      const researchEndId = crypto.randomUUID();
+      await createWorkflow({
+        name: "Book-First Fallback Workflow",
+        description: "Two-agent workflow that researches the book first and then falls back to general knowledge when needed",
+        nodes: [
+          { id: researchStartId, node_type: "start", agent_config_id: null, position_x: 250, position_y: 50, config: null },
+          { id: researchAgentId, node_type: "agent", agent_config_id: researchConfigId, position_x: 250, position_y: 200, config: null },
+          { id: synthAgentId, node_type: "agent", agent_config_id: synthConfigId, position_x: 250, position_y: 350, config: null },
+          { id: researchEndId, node_type: "end", agent_config_id: null, position_x: 250, position_y: 500, config: null },
+        ],
+        edges: [
+          { id: crypto.randomUUID(), source_node_id: researchStartId, target_node_id: researchAgentId, condition_type: null, condition_value: null, label: null },
+          { id: crypto.randomUUID(), source_node_id: researchAgentId, target_node_id: synthAgentId, condition_type: null, condition_value: null, label: null },
+          { id: crypto.randomUUID(), source_node_id: synthAgentId, target_node_id: researchEndId, condition_type: null, condition_value: null, label: null },
+        ],
+      });
+
+      fetchConfigs();
+      fetchPipelines();
     } catch (err) {
-      setError("Failed to seed configurations and workflows");
+      setError(err instanceof Error ? err.message : "Failed to seed configurations and workflows");
     }
   };
 
