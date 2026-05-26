@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	a "encore.app/backend/auth"
+	"encore.app/backend/content"
 	"encore.app/backend/settings"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
@@ -393,20 +395,28 @@ func SeedConfigs(ctx context.Context) (*SeedConfigsResponse, error) {
 	if err != nil {
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to load settings"}
 	}
-	if settingsResp.DefaultDatasetID == "" {
-		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "set a default dataset in Settings before seeding workflows"}
+	datasetID := settingsResp.DefaultDatasetID
+	if datasetID == "" {
+		datasetsResp, dsErr := content.ListDatasets(ctx, &content.ListDatasetsParams{Status: "ready"})
+		if dsErr != nil {
+			return nil, &errs.Error{Code: errs.Internal, Message: "failed to resolve a ready dataset"}
+		}
+		if len(datasetsResp.Datasets) == 0 {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "no ready dataset found; create and finish one in the Content admin page first"}
+		}
+		datasetID = datasetsResp.Datasets[0].ID
 	}
 
-	configsCount, err := SeedDefaultConfigs(ctx, string(uid), settingsResp.DefaultDatasetID)
+	configsCount, err := SeedDefaultConfigs(ctx, string(uid), datasetID)
 	if err != nil {
 		rlog.Error("failed to seed configs", "error", err)
-		return nil, &errs.Error{Code: errs.Internal, Message: "failed to seed configs"}
+		return nil, &errs.Error{Code: errs.Internal, Message: fmt.Sprintf("failed to seed configs: %v", err)}
 	}
 
-	workflowsCount, err := SeedDefaultWorkflows(ctx, string(uid), settingsResp.DefaultDatasetID)
+	workflowsCount, err := SeedDefaultWorkflows(ctx, string(uid), datasetID)
 	if err != nil {
 		rlog.Error("failed to seed workflows", "error", err)
-		return nil, &errs.Error{Code: errs.Internal, Message: "failed to seed workflows"}
+		return nil, &errs.Error{Code: errs.Internal, Message: fmt.Sprintf("failed to seed workflows: %v", err)}
 	}
 
 	return &SeedConfigsResponse{

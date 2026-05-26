@@ -179,15 +179,16 @@ export default function AdminPipelinesPage() {
     if (!token) return;
 
     try {
-          const res = await fetch(`${API_URL}/pipelines/seed`, {
+      const res = await fetch(`${API_URL}/pipelines/seed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         fetchConfigs();
       } else {
-        setError("Failed to seed configurations and workflows");
+        setError((data as { message?: string })?.message ?? "Failed to seed configurations and workflows");
       }
     } catch (err) {
       setError("Failed to seed configurations and workflows");
