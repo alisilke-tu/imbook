@@ -82,7 +82,7 @@ function IndexPage() {
           >
             An interactive learning environment where you can engage with course
             content, define your learning patterns, and personalize your
-            educational journey. Built as part of a TUM master thesis project.
+            educational journey.
           </Typography>
 
           <Button
