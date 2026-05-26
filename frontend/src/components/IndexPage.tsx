@@ -171,24 +171,6 @@ function IndexPage() {
               borderColor: "primary.main",
             }}
           >
-            <Typography
-              variant="caption"
-              component="p"
-              sx={{
-                mb: 3,
-              }}
-            >
-              Master Thesis Project – Technical University of Munich
-            </Typography>
-
-            <Typography
-              variant="h3"
-              sx={{
-                mb: 2,
-              }}
-            >
-              Research Objective
-            </Typography>
 
             <Typography
               variant="body1"
@@ -198,10 +180,10 @@ function IndexPage() {
             >
               This research project focuses on developing an interactive digital
               learning platform that transforms the traditional approach to
-              Information Management education. Building upon Professor Krcmar's
-              comprehensive curriculum at the Technical University of Munich,
-              the platform introduces adaptive learning mechanisms that respond
-              to individual student behaviors and preferences.
+              Information Management education. Building upon Professor 
+              Krcmar's Information Management (2015) textbook, the platform 
+              introduces adaptive learning mechanisms that respond to individual 
+              behaviors and preferences.
             </Typography>
 
             <Typography
@@ -225,7 +207,7 @@ function IndexPage() {
               }}
             >
               The theoretical foundation of this work combines principles from
-              cognitive psychology, human-computer interaction, and information
+              human-computer interaction and information
               systems research to create a comprehensive framework for
               interactive learning in the context of Information Management
               education.
