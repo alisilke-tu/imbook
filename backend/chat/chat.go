@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"encore.app/backend/content"
@@ -312,6 +313,46 @@ type ChatHistoryTurn struct {
 	Assistant string `json:"assistant"`
 }
 
+var (
+	whatIsPattern       = regexp.MustCompile(`(?i)\bwas\s+ist\s+([\p{L}\p{N}\-]{1,30})\b`)
+	standsForPattern    = regexp.MustCompile(`(?i)\b([\p{L}\p{N}\-]{1,30})\s+steht\s+f[üu]r\b`)
+	pronounMessageHints = []string{" es ", " it ", " this ", " that ", " damit ", " darauf ", " davon "}
+)
+
+func normalizeForHintMatch(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		return ""
+	}
+	return " " + s + " "
+}
+
+func likelyPronounFollowUp(message string) bool {
+	n := normalizeForHintMatch(message)
+	if n == "" {
+		return false
+	}
+	for _, h := range pronounMessageHints {
+		if strings.Contains(n, h) {
+			return true
+		}
+	}
+	return false
+}
+
+func inferRecentReferent(historyTurns []ChatHistoryTurn) string {
+	for i := len(historyTurns) - 1; i >= 0; i-- {
+		t := historyTurns[i]
+		if m := whatIsPattern.FindStringSubmatch(t.User); len(m) > 1 {
+			return strings.TrimSpace(m[1])
+		}
+		if m := standsForPattern.FindStringSubmatch(t.Assistant); len(m) > 1 {
+			return strings.TrimSpace(m[1])
+		}
+	}
+	return ""
+}
+
 func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxTurns int) string {
 	msg := strings.TrimSpace(message)
 	if msg == "" {
@@ -348,6 +389,15 @@ func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxT
 	b.WriteString("- Use the conversation context above to resolve short follow-up questions.\n")
 	b.WriteString("- If the current question contains pronouns like 'es/it/this/that', map them to the most recent relevant concept from prior turns, unless there is a clear conflict.\n")
 	b.WriteString("- Keep the original intent of the current user question.\n\n")
+
+	if likelyPronounFollowUp(msg) {
+		if referent := inferRecentReferent(clean); referent != "" {
+			b.WriteString("Likely referent from recent turns: ")
+			b.WriteString(referent)
+			b.WriteString("\n\n")
+		}
+	}
+
 	b.WriteString("Current user question:\n")
 	b.WriteString(msg)
 
