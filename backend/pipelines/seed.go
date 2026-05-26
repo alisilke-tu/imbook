@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"errors"
 
 	"github.com/lib/pq"
 )
@@ -37,12 +36,14 @@ func datasetToolConfig(datasetID string) []ToolConfig {
 
 func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigParams) (bool, error) {
 	var existingID string
-	err := pipelineDB.QueryRow(ctx, `SELECT id FROM agent_configs WHERE name = $1 LIMIT 1`, cfg.Name).Scan(&existingID)
-	if err == nil {
-		return false, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	err := pipelineDB.QueryRow(ctx, `
+		SELECT COALESCE((SELECT id::text FROM agent_configs WHERE name = $1 LIMIT 1), '')
+	`, cfg.Name).Scan(&existingID)
+	if err != nil {
 		return false, err
+	}
+	if existingID != "" {
+		return false, nil
 	}
 
 	var toolConfigsJSON []byte
@@ -74,24 +75,28 @@ func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigP
 
 func getConfigIDByName(ctx context.Context, name string) (string, error) {
 	var id string
-	err := pipelineDB.QueryRow(ctx, `SELECT id FROM agent_configs WHERE name = $1 LIMIT 1`, name).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("agent config not found: %s", name)
-	}
+	err := pipelineDB.QueryRow(ctx, `
+		SELECT COALESCE((SELECT id::text FROM agent_configs WHERE name = $1 LIMIT 1), '')
+	`, name).Scan(&id)
 	if err != nil {
 		return "", err
+	}
+	if id == "" {
+		return "", fmt.Errorf("agent config not found: %s", name)
 	}
 	return id, nil
 }
 
 func seedPipeline(ctx context.Context, userID string, spec workflowSeedSpec) (bool, error) {
 	var existingID string
-	err := pipelineDB.QueryRow(ctx, `SELECT id FROM pipelines WHERE name = $1 LIMIT 1`, spec.name).Scan(&existingID)
-	if err == nil {
-		return false, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	err := pipelineDB.QueryRow(ctx, `
+		SELECT COALESCE((SELECT id::text FROM pipelines WHERE name = $1 LIMIT 1), '')
+	`, spec.name).Scan(&existingID)
+	if err != nil {
 		return false, err
+	}
+	if existingID != "" {
+		return false, nil
 	}
 
 	tx, err := pipelineDB.Begin(ctx)
