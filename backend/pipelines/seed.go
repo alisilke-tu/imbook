@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"errors"
 
 	"github.com/lib/pq"
 )
@@ -40,7 +41,7 @@ func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigP
 	if err == nil {
 		return false, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}
 
@@ -74,7 +75,7 @@ func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigP
 func getConfigIDByName(ctx context.Context, name string) (string, error) {
 	var id string
 	err := pipelineDB.QueryRow(ctx, `SELECT id FROM agent_configs WHERE name = $1 LIMIT 1`, name).Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("agent config not found: %s", name)
 	}
 	if err != nil {
@@ -89,7 +90,7 @@ func seedPipeline(ctx context.Context, userID string, spec workflowSeedSpec) (bo
 	if err == nil {
 		return false, nil
 	}
-	if err != sql.ErrNoRows {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return false, err
 	}
 
