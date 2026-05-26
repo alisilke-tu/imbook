@@ -179,7 +179,7 @@ export default function AdminPipelinesPage() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/pipelines/seed`, {
+          const res = await fetch(`${API_URL}/pipelines/seed`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -187,10 +187,10 @@ export default function AdminPipelinesPage() {
       if (res.ok) {
         fetchConfigs();
       } else {
-        setError("Failed to seed configurations");
+        setError("Failed to seed configurations and workflows");
       }
     } catch (err) {
-      setError("Failed to seed configurations");
+      setError("Failed to seed configurations and workflows");
     }
   };
 
@@ -283,7 +283,7 @@ export default function AdminPipelinesPage() {
                 }
               }}
             >
-              Seed Default Configs
+              Seed Default Configs & Workflows
             </Button>
           )}
           <Button 

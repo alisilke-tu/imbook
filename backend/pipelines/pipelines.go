@@ -375,8 +375,9 @@ func GetDefaultConfig(ctx context.Context) (*AgentConfig, error) {
 
 // SeedConfigsResponse for seed endpoint
 type SeedConfigsResponse struct {
-	Message string `json:"message"`
-	Count   int    `json:"count"`
+	Message       string `json:"message"`
+	ConfigsCount  int    `json:"configs_count"`
+	WorkflowsCount int   `json:"workflows_count"`
 }
 
 // SeedConfigs seeds the database with default agent configurations (admin only)
@@ -388,17 +389,30 @@ func SeedConfigs(ctx context.Context) (*SeedConfigsResponse, error) {
 	}
 
 	uid, _ := auth.UserID()
-	if err := SeedDefaultConfigs(ctx, string(uid)); err != nil {
+	settingsResp, err := settings.Get(ctx)
+	if err != nil {
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to load settings"}
+	}
+	if settingsResp.DefaultDatasetID == "" {
+		return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "set a default dataset in Settings before seeding workflows"}
+	}
+
+	configsCount, err := SeedDefaultConfigs(ctx, string(uid), settingsResp.DefaultDatasetID)
+	if err != nil {
 		rlog.Error("failed to seed configs", "error", err)
 		return nil, &errs.Error{Code: errs.Internal, Message: "failed to seed configs"}
 	}
 
-	var count int
-	pipelineDB.QueryRow(ctx, `SELECT COUNT(*) FROM agent_configs`).Scan(&count)
+	workflowsCount, err := SeedDefaultWorkflows(ctx, string(uid), settingsResp.DefaultDatasetID)
+	if err != nil {
+		rlog.Error("failed to seed workflows", "error", err)
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to seed workflows"}
+	}
 
 	return &SeedConfigsResponse{
-		Message: "Default agent configurations seeded successfully",
-		Count:   count,
+		Message:       "Default agent configurations and workflows seeded successfully",
+		ConfigsCount:  configsCount,
+		WorkflowsCount: workflowsCount,
 	}, nil
 }
 
