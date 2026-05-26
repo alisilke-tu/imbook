@@ -111,6 +111,8 @@ func (e *AgentExecutor) execute(ctx context.Context, query string, stream Stream
 		agentExecutor,
 		query,
 		chains.WithCallback(callbacksHandler),
+		chains.WithTemperature(e.config.Temperature),
+		chains.WithMaxTokens(e.config.MaxTokens),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed: %w", err)
