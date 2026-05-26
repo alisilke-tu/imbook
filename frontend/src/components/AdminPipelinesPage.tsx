@@ -22,9 +22,13 @@ import { FirebaseContext } from "../lib/firebase.tsx";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 const HIDDEN_WORKFLOW_NAMES = new Set([
-  "MAS (Book first + Fallback)",
-  "Precise Researcher",
+  "mas (book first + fallback)",
+  "precise researcher",
 ]);
+
+function isHiddenWorkflowName(name: string): boolean {
+  return HIDDEN_WORKFLOW_NAMES.has(name.trim().toLowerCase());
+}
 
 type AgentConfig = {
   id: string;
@@ -95,7 +99,7 @@ export default function AdminPipelinesPage() {
       if (res.ok) {
         const data = await res.json();
         const list: Pipeline[] = data.pipelines || [];
-        setPipelines(list.filter((p) => !HIDDEN_WORKFLOW_NAMES.has(p.name)));
+        setPipelines(list.filter((p) => !isHiddenWorkflowName(p.name)));
       } else {
         setError("Failed to fetch pipelines");
       }
