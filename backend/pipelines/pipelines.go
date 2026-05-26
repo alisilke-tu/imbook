@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	a "encore.app/backend/auth"
-	"encore.app/backend/content"
 	"encore.app/backend/settings"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
@@ -38,13 +36,6 @@ type ListConfigsParams struct {
 //
 //encore:api auth method=GET path=/pipelines/configs
 func ListConfigs(ctx context.Context, params *ListConfigsParams) (*ListConfigsResponse, error) {
-	if a.IsAdmin(ctx) {
-		uid, _ := auth.UserID()
-		if err := EnsureDefaultAgentsAndWorkflows(ctx, string(uid)); err != nil {
-			rlog.Warn("bootstrap defaults on config list failed", "error", err)
-		}
-	}
-
 	includeDisabled := params.IncludeDisabled && a.IsAdmin(ctx)
 
 	var query string
@@ -93,17 +84,12 @@ func ListConfigs(ctx context.Context, params *ListConfigsParams) (*ListConfigsRe
 
 	return &ListConfigsResponse{Configs: configs}, nil
 }
-	availableTools := params.AvailableTools
-	if availableTools == nil {
-		availableTools = []string{}
-	}
 
-	insertErr := pipelineDB.QueryRow(ctx, `
 // GetConfig returns a specific agent configuration
 //
 //encore:api auth method=GET path=/pipelines/configs/:id
 func GetConfig(ctx context.Context, id string) (*AgentConfig, error) {
-		params.Temperature, pq.Array(availableTools), toolConfigsJSON, params.IsDefault, uid).Scan(&id)
+	var config AgentConfig
 
 	var toolsStr string
 	var toolConfigsJSON []byte
@@ -183,7 +169,7 @@ func CreateConfig(ctx context.Context, params *CreateConfigParams) (*AgentConfig
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "system prompt is required"}
 	}
 	if params.Model == "" {
-		params.Temperature, pq.Array(availableTools), toolConfigsJSON, params.IsEnabled, id)
+		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "model is required"}
 	}
 	if params.Temperature < 0 || params.Temperature > 2 {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "temperature must be between 0 and 2"}
@@ -334,10 +320,33 @@ func DeleteConfig(ctx context.Context, id string) error {
 		return &errs.Error{Code: errs.PermissionDenied, Message: "admin access required"}
 	}
 
-	_, deleteErr := pipelineDB.Exec(ctx, `DELETE FROM agent_configs WHERE id = $1`, id)
-	if deleteErr != nil {
+	tx, err := pipelineDB.Begin(ctx)
+	if err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to start transaction"}
+	}
+	defer tx.Rollback()
+
+	// Legacy chat tables reference agent configs and can block deletion.
+	if _, err = tx.Exec(ctx, `DELETE FROM execution_traces WHERE config_id = $1`, id); err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to delete config traces"}
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM chat_sessions WHERE config_id = $1`, id); err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to delete config sessions"}
+	}
+
+	// Remove workflow nodes that point to this config.
+	if _, err = tx.Exec(ctx, `DELETE FROM pipeline_nodes WHERE agent_config_id = $1`, id); err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to delete config workflow nodes"}
+	}
+
+	if _, err = tx.Exec(ctx, `DELETE FROM agent_configs WHERE id = $1`, id); err != nil {
 		return &errs.Error{Code: errs.Internal, Message: "failed to delete config"}
 	}
+
+	if err = tx.Commit(); err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to commit config deletion"}
+	}
+
 	return nil
 }
 
@@ -389,9 +398,8 @@ func GetDefaultConfig(ctx context.Context) (*AgentConfig, error) {
 
 // SeedConfigsResponse for seed endpoint
 type SeedConfigsResponse struct {
-	Message       string `json:"message"`
-	ConfigsCount  int    `json:"configs_count"`
-	WorkflowsCount int   `json:"workflows_count"`
+	Message string `json:"message"`
+	Count   int    `json:"count"`
 }
 
 // SeedConfigs seeds the database with default agent configurations (admin only)
@@ -403,38 +411,17 @@ func SeedConfigs(ctx context.Context) (*SeedConfigsResponse, error) {
 	}
 
 	uid, _ := auth.UserID()
-	settingsResp, err := settings.Get(ctx)
-	if err != nil {
-		return nil, &errs.Error{Code: errs.Internal, Message: "failed to load settings"}
-	}
-	datasetID := settingsResp.DefaultDatasetID
-	if datasetID == "" {
-		datasetsResp, dsErr := content.ListDatasets(ctx, &content.ListDatasetsParams{Status: "ready"})
-		if dsErr != nil {
-			return nil, &errs.Error{Code: errs.Internal, Message: "failed to resolve a ready dataset"}
-		}
-		if len(datasetsResp.Datasets) == 0 {
-			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "no ready dataset found; create and finish one in the Content admin page first"}
-		}
-		datasetID = datasetsResp.Datasets[0].ID
-	}
-
-	configsCount, err := SeedDefaultConfigs(ctx, string(uid), datasetID)
-	if err != nil {
+	if err := SeedDefaultConfigs(ctx, string(uid)); err != nil {
 		rlog.Error("failed to seed configs", "error", err)
-		return nil, &errs.Error{Code: errs.Internal, Message: fmt.Sprintf("failed to seed configs: %v", err)}
+		return nil, &errs.Error{Code: errs.Internal, Message: "failed to seed configs"}
 	}
 
-	workflowsCount, err := SeedDefaultWorkflows(ctx, string(uid), datasetID)
-	if err != nil {
-		rlog.Error("failed to seed workflows", "error", err)
-		return nil, &errs.Error{Code: errs.Internal, Message: fmt.Sprintf("failed to seed workflows: %v", err)}
-	}
+	var count int
+	pipelineDB.QueryRow(ctx, `SELECT COUNT(*) FROM agent_configs`).Scan(&count)
 
 	return &SeedConfigsResponse{
-		Message:       "Default agent configurations and workflows seeded successfully",
-		ConfigsCount:  configsCount,
-		WorkflowsCount: workflowsCount,
+		Message: "Default agent configurations seeded successfully",
+		Count:   count,
 	}, nil
 }
 
@@ -450,11 +437,6 @@ type ListPipelinesResponse struct {
 //encore:api auth method=GET path=/pipelines/workflows
 func ListPipelines(ctx context.Context) (*ListPipelinesResponse, error) {
 	uid, _ := auth.UserID()
-	if a.IsAdmin(ctx) {
-		if err := EnsureDefaultAgentsAndWorkflows(ctx, string(uid)); err != nil {
-			rlog.Warn("bootstrap defaults on pipeline list failed", "error", err)
-		}
-	}
 
 	rows, err := pipelineDB.Query(ctx, `
 		SELECT id, name, description, created_by, is_enabled, created_at, updated_at
@@ -727,9 +709,23 @@ func DeletePipeline(ctx context.Context, id string) error {
 		return &errs.Error{Code: errs.PermissionDenied, Message: "not authorized to delete this pipeline"}
 	}
 
-	_, err = pipelineDB.Exec(ctx, `DELETE FROM pipelines WHERE id = $1`, id)
+	tx, err := pipelineDB.Begin(ctx)
 	if err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to start transaction"}
+	}
+	defer tx.Rollback()
+
+	// Pipeline executions keep a foreign key to pipelines and must be removed first.
+	if _, err = tx.Exec(ctx, `DELETE FROM pipeline_executions WHERE pipeline_id = $1`, id); err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to delete pipeline executions"}
+	}
+
+	if _, err = tx.Exec(ctx, `DELETE FROM pipelines WHERE id = $1`, id); err != nil {
 		return &errs.Error{Code: errs.Internal, Message: "failed to delete pipeline"}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return &errs.Error{Code: errs.Internal, Message: "failed to commit pipeline deletion"}
 	}
 
 	return nil
