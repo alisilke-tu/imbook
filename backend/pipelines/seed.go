@@ -2,7 +2,6 @@ package pipelines
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -35,14 +34,11 @@ func datasetToolConfig(datasetID string) []ToolConfig {
 }
 
 func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigParams) (bool, error) {
-	var existingID string
-	err := pipelineDB.QueryRow(ctx, `
-		SELECT COALESCE((SELECT id::text FROM agent_configs WHERE name = $1 LIMIT 1), '')
-	`, cfg.Name).Scan(&existingID)
-	if err != nil {
+	var existingCount int
+	if err := pipelineDB.QueryRow(ctx, `SELECT COUNT(*) FROM agent_configs WHERE name = $1`, cfg.Name).Scan(&existingCount); err != nil {
 		return false, err
 	}
-	if existingID != "" {
+	if existingCount > 0 {
 		return false, nil
 	}
 
@@ -75,27 +71,19 @@ func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigP
 
 func getConfigIDByName(ctx context.Context, name string) (string, error) {
 	var id string
-	err := pipelineDB.QueryRow(ctx, `
-		SELECT COALESCE((SELECT id::text FROM agent_configs WHERE name = $1 LIMIT 1), '')
-	`, name).Scan(&id)
+	err := pipelineDB.QueryRow(ctx, `SELECT id::text FROM agent_configs WHERE name = $1 LIMIT 1`, name).Scan(&id)
 	if err != nil {
-		return "", err
-	}
-	if id == "" {
-		return "", fmt.Errorf("agent config not found: %s", name)
+		return "", fmt.Errorf("agent config %q not found: %v", name, err)
 	}
 	return id, nil
 }
 
 func seedPipeline(ctx context.Context, userID string, spec workflowSeedSpec) (bool, error) {
-	var existingID string
-	err := pipelineDB.QueryRow(ctx, `
-		SELECT COALESCE((SELECT id::text FROM pipelines WHERE name = $1 LIMIT 1), '')
-	`, spec.name).Scan(&existingID)
-	if err != nil {
+	var existingCount int
+	if err := pipelineDB.QueryRow(ctx, `SELECT COUNT(*) FROM pipelines WHERE name = $1`, spec.name).Scan(&existingCount); err != nil {
 		return false, err
 	}
-	if existingID != "" {
+	if existingCount > 0 {
 		return false, nil
 	}
 
@@ -227,6 +215,40 @@ Guidelines:
 			IsDefault:   false,
 		},
 		{
+			Name:        "Book Only Agent",
+			Description: "Answers strictly from the book and avoids outside knowledge",
+			SystemPrompt: `You answer strictly from the book content retrieved by search_chunks.
+
+Rules:
+- Always search the book before answering
+- Use only evidence directly supported by retrieved passages
+- If the book does not support an answer, say so clearly
+- Do not add outside knowledge or speculation
+- Keep the response concise and evidence-based`,
+			Model:       "google/gemini-2.0-flash-001",
+			MaxTokens:   3000,
+			Temperature: 0.1,
+			ToolConfigs: datasetToolConfig(datasetID),
+			IsDefault:   false,
+		},
+		{
+			Name:        "Book and Explorer Agent",
+			Description: "Book-grounded agent that can explain and connect ideas more broadly",
+			SystemPrompt: `You are a book-grounded explorer.
+
+Rules:
+- Search the book first and anchor your answer in the retrieved passages
+- Explain ideas clearly and connect them to related concepts when useful
+- If the book does not contain enough evidence, say that clearly before adding broader context
+- Stay grounded in the topic of the book
+- Keep the answer helpful, structured, and readable`,
+			Model:       "google/gemini-2.0-flash-001",
+			MaxTokens:   3500,
+			Temperature: 0.5,
+			ToolConfigs: datasetToolConfig(datasetID),
+			IsDefault:   false,
+		},
+		{
 			Name:        "Strict Book Answerer",
 			Description: "Answers only from book evidence with no outside knowledge",
 			SystemPrompt: `You answer only from the book content retrieved by search_chunks.
@@ -344,4 +366,39 @@ func SeedDefaultWorkflows(ctx context.Context, userID, datasetID string) (int, e
 	}
 
 	return inserted, nil
+}
+
+// EnsureDefaultAgentsAndWorkflows bootstraps the comparison workflows if needed.
+func EnsureDefaultAgentsAndWorkflows(ctx context.Context, userID string) error {
+	datasetID, err := resolveBootstrapDatasetID(ctx)
+	if err != nil {
+		return err
+	}
+
+	if _, err := SeedDefaultConfigs(ctx, userID, datasetID); err != nil {
+		return err
+	}
+	if _, err := SeedDefaultWorkflows(ctx, userID, datasetID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func resolveBootstrapDatasetID(ctx context.Context) (string, error) {
+	settingsResp, err := settings.Get(ctx)
+	if err != nil {
+		return "", err
+	}
+	if settingsResp.DefaultDatasetID != "" {
+		return settingsResp.DefaultDatasetID, nil
+	}
+
+	datasetsResp, err := content.ListDatasets(ctx, &content.ListDatasetsParams{Status: "ready"})
+	if err != nil {
+		return "", err
+	}
+	if len(datasetsResp.Datasets) == 0 {
+		return "", fmt.Errorf("no ready dataset found; create and finish one in the Content admin page first")
+	}
+	return datasetsResp.Datasets[0].ID, nil
 }

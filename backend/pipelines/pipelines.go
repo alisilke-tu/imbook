@@ -38,6 +38,13 @@ type ListConfigsParams struct {
 //
 //encore:api auth method=GET path=/pipelines/configs
 func ListConfigs(ctx context.Context, params *ListConfigsParams) (*ListConfigsResponse, error) {
+	if a.IsAdmin(ctx) {
+		uid, _ := auth.UserID()
+		if err := EnsureDefaultAgentsAndWorkflows(ctx, string(uid)); err != nil {
+			rlog.Warn("bootstrap defaults on config list failed", "error", err)
+		}
+	}
+
 	includeDisabled := params.IncludeDisabled && a.IsAdmin(ctx)
 
 	var query string
@@ -443,6 +450,11 @@ type ListPipelinesResponse struct {
 //encore:api auth method=GET path=/pipelines/workflows
 func ListPipelines(ctx context.Context) (*ListPipelinesResponse, error) {
 	uid, _ := auth.UserID()
+	if a.IsAdmin(ctx) {
+		if err := EnsureDefaultAgentsAndWorkflows(ctx, string(uid)); err != nil {
+			rlog.Warn("bootstrap defaults on pipeline list failed", "error", err)
+		}
+	}
 
 	rows, err := pipelineDB.Query(ctx, `
 		SELECT id, name, description, created_by, is_enabled, created_at, updated_at
