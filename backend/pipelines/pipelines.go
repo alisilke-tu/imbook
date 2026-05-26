@@ -86,12 +86,17 @@ func ListConfigs(ctx context.Context, params *ListConfigsParams) (*ListConfigsRe
 
 	return &ListConfigsResponse{Configs: configs}, nil
 }
+	availableTools := params.AvailableTools
+	if availableTools == nil {
+		availableTools = []string{}
+	}
 
+	insertErr := pipelineDB.QueryRow(ctx, `
 // GetConfig returns a specific agent configuration
 //
 //encore:api auth method=GET path=/pipelines/configs/:id
 func GetConfig(ctx context.Context, id string) (*AgentConfig, error) {
-	var config AgentConfig
+		params.Temperature, pq.Array(availableTools), toolConfigsJSON, params.IsDefault, uid).Scan(&id)
 
 	var toolsStr string
 	var toolConfigsJSON []byte
@@ -171,7 +176,7 @@ func CreateConfig(ctx context.Context, params *CreateConfigParams) (*AgentConfig
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "system prompt is required"}
 	}
 	if params.Model == "" {
-		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "model is required"}
+		params.Temperature, pq.Array(availableTools), toolConfigsJSON, params.IsEnabled, id)
 	}
 	if params.Temperature < 0 || params.Temperature > 2 {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "temperature must be between 0 and 2"}

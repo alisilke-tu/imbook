@@ -53,12 +53,17 @@ func insertConfigIfMissing(ctx context.Context, userID string, cfg CreateConfigP
 		}
 	}
 
+	availableTools := cfg.AvailableTools
+	if availableTools == nil {
+		availableTools = []string{}
+	}
+
 	_, err = pipelineDB.Exec(ctx, `
 		INSERT INTO agent_configs (name, description, system_prompt, model, max_tokens,
 		                           temperature, available_tools, tool_configs, is_default, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`, cfg.Name, cfg.Description, cfg.SystemPrompt, cfg.Model, cfg.MaxTokens,
-		cfg.Temperature, pq.Array(cfg.AvailableTools), toolConfigsJSON, cfg.IsDefault, userID)
+		cfg.Temperature, pq.Array(availableTools), toolConfigsJSON, cfg.IsDefault, userID)
 	if err != nil {
 		return false, err
 	}
