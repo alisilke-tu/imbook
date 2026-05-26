@@ -67,6 +67,34 @@ type Message = {
   agentReplies?: AgentReply[];
 };
 
+type ChatHistoryTurn = {
+  user: string;
+  assistant: string;
+};
+
+function buildLastTurns(messages: Message[], maxTurns: number): ChatHistoryTurn[] {
+  const turns: ChatHistoryTurn[] = [];
+  let pendingUser: string | null = null;
+
+  for (const msg of messages) {
+    const text = msg.text.trim();
+    if (!text) continue;
+
+    if (msg.role === "user") {
+      pendingUser = text;
+      continue;
+    }
+
+    if (msg.role === "assistant" && pendingUser) {
+      turns.push({ user: pendingUser, assistant: text });
+      pendingUser = null;
+    }
+  }
+
+  if (turns.length <= maxTurns) return turns;
+  return turns.slice(turns.length - maxTurns);
+}
+
 function showAgentReplyBlocks(agentReplies: AgentReply[] | undefined, finalText: string): boolean {
   const filtered = filterAgentRepliesForDisplay(agentReplies, finalText);
   return (filtered?.length ?? 0) > 0;
@@ -495,6 +523,7 @@ export default function ChatPage() {
     setStreamAgentReplies([]);
     setStreamReply("");
     setCurrentNode("");
+    const historyTurns = buildLastTurns(messages, 6);
     
     try {
       const token = await auth.currentUser.getIdToken();
@@ -505,6 +534,7 @@ export default function ChatPage() {
           message: text,
           pipeline_id: selectedWorkflow,
           learning_session_id: sid,
+          history_turns: historyTurns,
         }),
       });
       

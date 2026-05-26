@@ -303,6 +303,51 @@ type ChatPipelineParams struct {
 	Message             string  `json:"message"`
 	PipelineID          string  `json:"pipeline_id"` // Optional; uses first available workflow if empty
 	LearningSessionID   *string `json:"learning_session_id,omitempty"`
+	HistoryTurns        []ChatHistoryTurn `json:"history_turns,omitempty"`
+}
+
+// ChatHistoryTurn is one prior user-assistant pair sent by the chat client as short-term memory.
+type ChatHistoryTurn struct {
+	User      string `json:"user"`
+	Assistant string `json:"assistant"`
+}
+
+func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxTurns int) string {
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		return ""
+	}
+
+	if len(historyTurns) == 0 || maxTurns <= 0 {
+		return msg
+	}
+
+	clean := make([]ChatHistoryTurn, 0, len(historyTurns))
+	for _, t := range historyTurns {
+		u := strings.TrimSpace(t.User)
+		a := strings.TrimSpace(t.Assistant)
+		if u == "" || a == "" {
+			continue
+		}
+		clean = append(clean, ChatHistoryTurn{User: u, Assistant: a})
+	}
+
+	if len(clean) == 0 {
+		return msg
+	}
+	if len(clean) > maxTurns {
+		clean = clean[len(clean)-maxTurns:]
+	}
+
+	var b strings.Builder
+	b.WriteString("Conversation context (last turns):\n")
+	for i, t := range clean {
+		fmt.Fprintf(&b, "Turn %d\nUser: %s\nAssistant: %s\n\n", i+1, t.User, t.Assistant)
+	}
+	b.WriteString("Current user question:\n")
+	b.WriteString(msg)
+
+	return b.String()
 }
 
 // ChatPipelineResponse includes execution metadata
@@ -332,8 +377,9 @@ func ChatWithPipeline(ctx context.Context, params *ChatPipelineParams) (*ChatPip
 	}
 
 	lsID := resolveLearningSessionID(ctx, params.LearningSessionID)
+	query := buildPipelineChatQuery(params.Message, params.HistoryTurns, 6)
 	execResult, err := pipelines.ExecutePipeline(ctx, pipelineID, &pipelines.ExecutePipelineParams{
-		Query:             params.Message,
+		Query:             query,
 		LearningSessionID: lsID,
 	})
 	if err != nil {
@@ -403,6 +449,7 @@ func StreamPipeline(w http.ResponseWriter, req *http.Request) {
 	}
 
 	lsID := resolveLearningSessionID(ctx, params.LearningSessionID)
+	query := buildPipelineChatQuery(params.Message, params.HistoryTurns, 6)
 	executor, err := pipelines.LoadPipelineExecutor(ctx, pipelineID, string(uid), apiKeyResp.Key, lsID)
 	if err != nil {
 		code := http.StatusInternalServerError
@@ -429,7 +476,7 @@ func StreamPipeline(w http.ResponseWriter, req *http.Request) {
 
 	stream := &sseWriter{w: w, flusher: flusher}
 
-	execution, trace, agentReplies, err := executor.ExecuteWithStreaming(ctx, params.Message, stream)
+	execution, trace, agentReplies, err := executor.ExecuteWithStreaming(ctx, query, stream)
 	if execution != nil {
 		_ = pipelines.PersistPipelineExecution(ctx, execution)
 	}
