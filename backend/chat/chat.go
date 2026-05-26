@@ -344,6 +344,10 @@ func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxT
 	for i, t := range clean {
 		fmt.Fprintf(&b, "Turn %d\nUser: %s\nAssistant: %s\n\n", i+1, t.User, t.Assistant)
 	}
+	b.WriteString("Instructions for the assistant:\n")
+	b.WriteString("- Use the conversation context above to resolve short follow-up questions.\n")
+	b.WriteString("- If the current question contains pronouns like 'es/it/this/that', map them to the most recent relevant concept from prior turns, unless there is a clear conflict.\n")
+	b.WriteString("- Keep the original intent of the current user question.\n\n")
 	b.WriteString("Current user question:\n")
 	b.WriteString(msg)
 
