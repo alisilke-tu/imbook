@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import {
   Box,
   Button,
@@ -12,20 +12,15 @@ import {
   MenuItem,
   Slider,
   Divider,
+  ListSubheader,
+  CircularProgress,
 } from "@mui/material";
 import { FirebaseContext } from "../lib/firebase.tsx";
 import ToolSelector from "./ToolSelector.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
-const AVAILABLE_MODELS = [
-  { value: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
-  { value: "google/gemini-2.0-pro", label: "Gemini 2.0 Pro" },
-  { value: "openai/gpt-4o", label: "GPT-4o" },
-  { value: "openai/gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "anthropic/claude-3-haiku", label: "Claude 3 Haiku" },
-];
+type LLMModel = { id: string; name: string; provider: string };
 
 const EXAMPLE_PROMPTS = {
   default: `You are a helpful assistant with access to a knowledge base. When users ask questions, use the search_chunks tool to find relevant information from the book. Provide clear, accurate answers based on the retrieved content.
@@ -77,6 +72,30 @@ export default function AgentConfigEditor({ config, onSave, onCancel }: AgentCon
   const [toolConfigs, setToolConfigs] = useState<ToolConfig[]>(config?.tool_configs || []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [availableModels, setAvailableModels] = useState<LLMModel[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const token = await auth?.currentUser?.getIdToken();
+        const res = await fetch(`${API_URL}/pipelines/models`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.models?.length > 0) {
+            setAvailableModels(data.models);
+          }
+        }
+      } catch {
+        // silently fall back to empty — user can still type a model ID
+      } finally {
+        setModelsLoading(false);
+      }
+    };
+    fetchModels();
+  }, [auth]);
 
   const loadExamplePrompt = (type: keyof typeof EXAMPLE_PROMPTS) => {
     setSystemPrompt(EXAMPLE_PROMPTS[type]);
@@ -226,12 +245,36 @@ export default function AgentConfigEditor({ config, onSave, onCancel }: AgentCon
             <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
               <FormControl fullWidth>
                 <InputLabel>Model</InputLabel>
-                <Select value={model} onChange={(e) => setModel(e.target.value)} label="Model">
-                  {AVAILABLE_MODELS.map((m) => (
-                    <MenuItem key={m.value} value={m.value}>
-                      {m.label}
-                    </MenuItem>
-                  ))}
+                <Select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  label="Model"
+                  startAdornment={
+                    modelsLoading ? (
+                      <CircularProgress size={16} sx={{ mr: 1 }} />
+                    ) : undefined
+                  }
+                >
+                  {availableModels.length > 0 ? (
+                    (() => {
+                      const byProvider: Record<string, LLMModel[]> = {};
+                      for (const m of availableModels) {
+                        (byProvider[m.provider] ??= []).push(m);
+                      }
+                      return Object.entries(byProvider).flatMap(([provider, models]) => [
+                        <ListSubheader key={provider} sx={{ textTransform: "capitalize", fontWeight: 700 }}>
+                          {provider}
+                        </ListSubheader>,
+                        ...models.map((m) => (
+                          <MenuItem key={m.id} value={m.id}>
+                            {m.name}
+                          </MenuItem>
+                        )),
+                      ]);
+                    })()
+                  ) : (
+                    <MenuItem value={model}>{model}</MenuItem>
+                  )}
                 </Select>
               </FormControl>
               <TextField
