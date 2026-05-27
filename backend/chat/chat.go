@@ -24,6 +24,7 @@ import (
 
 const openRouterBaseURL = "https://openrouter.ai/api/v1"
 const openRouterChatModel = "google/gemini-2.0-flash-001"
+const rewriteConfidenceThreshold = 0.55
 
 // streamEventKey is the context key for the SSE stream writer (used so the tool can send observations).
 type streamEventKey struct{}
@@ -316,28 +317,23 @@ type ChatHistoryTurn struct {
 var (
 	whatIsPattern       = regexp.MustCompile(`(?i)\bwas\s+ist\s+([\p{L}\p{N}\-]{1,30})\b`)
 	standsForPattern    = regexp.MustCompile(`(?i)\b([\p{L}\p{N}\-]{1,30})\s+steht\s+f[üu]r\b`)
-	pronounMessageHints = []string{" es ", " it ", " this ", " that ", " damit ", " darauf ", " davon "}
+	pronounPattern      = regexp.MustCompile(`(?i)\b(es|it|this|that|damit|darauf|davon)\b`)
+	followUpSignalPattern = regexp.MustCompile(`(?i)^(und|also|wie|warum|wieso|weshalb|welche|welcher|welches|gilt|passt|hängt)\b`)
 )
 
-func normalizeForHintMatch(s string) string {
-	s = strings.TrimSpace(strings.ToLower(s))
-	if s == "" {
-		return ""
-	}
-	return " " + s + " "
+type rewriteDecision struct {
+	StandaloneQuery      string   `json:"standalone_query"`
+	NeedsClarification   bool     `json:"needs_clarification"`
+	ClarificationQuestion string  `json:"clarification_question"`
+	Confidence           float64  `json:"confidence"`
+	ResolvedReferences   []string `json:"resolved_references"`
 }
 
 func likelyPronounFollowUp(message string) bool {
-	n := normalizeForHintMatch(message)
-	if n == "" {
+	if strings.TrimSpace(message) == "" {
 		return false
 	}
-	for _, h := range pronounMessageHints {
-		if strings.Contains(n, h) {
-			return true
-		}
-	}
-	return false
+	return pronounPattern.MatchString(message)
 }
 
 func inferRecentReferent(historyTurns []ChatHistoryTurn) string {
@@ -353,14 +349,9 @@ func inferRecentReferent(historyTurns []ChatHistoryTurn) string {
 	return ""
 }
 
-func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxTurns int) string {
-	msg := strings.TrimSpace(message)
-	if msg == "" {
-		return ""
-	}
-
+func normalizeHistoryTurns(historyTurns []ChatHistoryTurn, maxTurns int) []ChatHistoryTurn {
 	if len(historyTurns) == 0 || maxTurns <= 0 {
-		return msg
+		return nil
 	}
 
 	clean := make([]ChatHistoryTurn, 0, len(historyTurns))
@@ -373,11 +364,142 @@ func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxT
 		clean = append(clean, ChatHistoryTurn{User: u, Assistant: a})
 	}
 
-	if len(clean) == 0 {
-		return msg
-	}
 	if len(clean) > maxTurns {
 		clean = clean[len(clean)-maxTurns:]
+	}
+	return clean
+}
+
+func isPotentialFollowUp(message string) bool {
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		return false
+	}
+	if len(msg) <= 120 {
+		return true
+	}
+	if likelyPronounFollowUp(msg) {
+		return true
+	}
+	return followUpSignalPattern.MatchString(msg)
+}
+
+func extractJSONObject(raw string) string {
+	start := strings.Index(raw, "{")
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	for i := start; i < len(raw); i++ {
+		switch raw[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return raw[start : i+1]
+			}
+		}
+	}
+	return ""
+}
+
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
+func rewriteQueryWithHistory(ctx context.Context, apiKey string, message string, historyTurns []ChatHistoryTurn) (*rewriteDecision, error) {
+	msg := strings.TrimSpace(message)
+	clean := normalizeHistoryTurns(historyTurns, 8)
+	if msg == "" || len(clean) == 0 || !isPotentialFollowUp(msg) {
+		return &rewriteDecision{StandaloneQuery: msg, Confidence: 1}, nil
+	}
+
+	llm, err := openai.New(
+		openai.WithBaseURL(openRouterBaseURL),
+		openai.WithToken(apiKey),
+		openai.WithModel(openRouterChatModel),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var b strings.Builder
+	b.WriteString("You are a context resolver for a tutoring chat. Rewrite the latest user question into a fully standalone question.\n")
+	b.WriteString("Return JSON only with keys: standalone_query, needs_clarification, clarification_question, confidence, resolved_references.\n")
+	b.WriteString("Rules:\n")
+	b.WriteString("- Do not answer the question.\n")
+	b.WriteString("- Resolve references like pronouns, ellipsis, and short follow-ups using recent turns.\n")
+	b.WriteString("- confidence must be a number between 0 and 1.\n")
+	b.WriteString("- If context is insufficient, set needs_clarification=true and provide a short clarification_question.\n\n")
+	b.WriteString("Recent turns:\n")
+	for i, t := range clean {
+		fmt.Fprintf(&b, "Turn %d\nUser: %s\nAssistant: %s\n\n", i+1, t.User, t.Assistant)
+	}
+	b.WriteString("Latest user question:\n")
+	b.WriteString(msg)
+
+	raw, err := llms.GenerateFromSinglePrompt(ctx, llm, b.String())
+	if err != nil {
+		return nil, err
+	}
+
+	jsonText := extractJSONObject(raw)
+	if jsonText == "" {
+		return nil, fmt.Errorf("rewriter returned non-json output")
+	}
+
+	var out rewriteDecision
+	if err := json.Unmarshal([]byte(jsonText), &out); err != nil {
+		return nil, err
+	}
+
+	out.StandaloneQuery = strings.TrimSpace(out.StandaloneQuery)
+	out.ClarificationQuestion = strings.TrimSpace(out.ClarificationQuestion)
+	out.Confidence = clamp01(out.Confidence)
+	if out.StandaloneQuery == "" {
+		out.StandaloneQuery = msg
+	}
+
+	return &out, nil
+}
+
+func resolvePipelineQuery(ctx context.Context, apiKey string, message string, historyTurns []ChatHistoryTurn) (string, string) {
+	msg := strings.TrimSpace(message)
+	clean := normalizeHistoryTurns(historyTurns, 6)
+
+	decision, err := rewriteQueryWithHistory(ctx, apiKey, msg, clean)
+	if err != nil {
+		rlog.Warn("query rewrite failed, using fallback", "err", err)
+		return buildPipelineChatQuery(msg, clean, 6), ""
+	}
+
+	if decision.NeedsClarification && decision.Confidence < rewriteConfidenceThreshold {
+		if decision.ClarificationQuestion != "" {
+			return "", decision.ClarificationQuestion
+		}
+		return "", "Meinst du damit den zuletzt besprochenen Begriff? Bitte nenne ihn kurz, dann antworte ich praezise."
+	}
+
+	query := buildPipelineChatQuery(decision.StandaloneQuery, clean, 6)
+	return query, ""
+}
+
+func buildPipelineChatQuery(message string, historyTurns []ChatHistoryTurn, maxTurns int) string {
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		return ""
+	}
+
+	clean := normalizeHistoryTurns(historyTurns, maxTurns)
+	if len(clean) == 0 {
+		return msg
 	}
 
 	var b strings.Builder
@@ -420,6 +542,7 @@ func ChatWithPipeline(ctx context.Context, params *ChatPipelineParams) (*ChatPip
 	if params == nil || params.Message == "" {
 		return nil, &errs.Error{Code: errs.InvalidArgument, Message: "message is required"}
 	}
+	uid, _ := auth.UserID()
 
 	pipelineID := params.PipelineID
 	if pipelineID == "" {
@@ -431,7 +554,24 @@ func ChatWithPipeline(ctx context.Context, params *ChatPipelineParams) (*ChatPip
 	}
 
 	lsID := resolveLearningSessionID(ctx, params.LearningSessionID)
-	query := buildPipelineChatQuery(params.Message, params.HistoryTurns, 6)
+	apiKeyResp, err := settings.GetGeminiKey(ctx, &settings.GetGeminiKeyParams{UserID: string(uid)})
+	if err != nil {
+		if errs.Code(err) == errs.NotFound {
+			return nil, &errs.Error{Code: errs.FailedPrecondition, Message: "Set your OpenRouter API key in Settings."}
+		}
+		return nil, err
+	}
+
+	query, clarification := resolvePipelineQuery(ctx, apiKeyResp.Key, params.Message, params.HistoryTurns)
+	if clarification != "" {
+		return &ChatPipelineResponse{
+			Reply:        clarification,
+			ChunksUsed:   0,
+			ConfigUsed:   pipelineID,
+			Trace:        nil,
+			AgentReplies: nil,
+		}, nil
+	}
 	execResult, err := pipelines.ExecutePipeline(ctx, pipelineID, &pipelines.ExecutePipelineParams{
 		Query:             query,
 		LearningSessionID: lsID,
@@ -503,7 +643,28 @@ func StreamPipeline(w http.ResponseWriter, req *http.Request) {
 	}
 
 	lsID := resolveLearningSessionID(ctx, params.LearningSessionID)
-	query := buildPipelineChatQuery(params.Message, params.HistoryTurns, 6)
+	query, clarification := resolvePipelineQuery(ctx, apiKeyResp.Key, params.Message, params.HistoryTurns)
+	if clarification != "" {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming not supported", http.StatusInternalServerError)
+			return
+		}
+		stream := &sseWriter{w: w, flusher: flusher}
+		stream.WriteEvent("done", map[string]interface{}{
+			"reply":         clarification,
+			"tool_calls":    0,
+			"tokens_used":   0,
+			"trace":         []pipelines.ExecutionStep{},
+			"agent_replies": []pipelines.AgentReply{},
+		})
+		return
+	}
 	executor, err := pipelines.LoadPipelineExecutor(ctx, pipelineID, string(uid), apiKeyResp.Key, lsID)
 	if err != nil {
 		code := http.StatusInternalServerError
