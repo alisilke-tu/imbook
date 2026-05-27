@@ -18,7 +18,10 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import { FirebaseContext } from "../lib/firebase.tsx";
 import LearningSessionDialog, { type LearningSession } from "./LearningSessionDialog.tsx";
-import SessionSidebar, { type SessionWithConversations } from "./SessionSidebar.tsx";
+import SessionSidebar, {
+  type ConversationSummary,
+  type SessionWithConversations,
+} from "./SessionSidebar.tsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
@@ -131,7 +134,7 @@ type TraceRow = {
 };
 
 function MessageItem({ message }: { message: Message }) {
-  const [stepsOpen, setStepsOpen] = useState(true);
+  const [stepsOpen, setStepsOpen] = useState(false);
   const hasSteps = message.steps && message.steps.length > 0;
   return (
     <Box sx={{ mb: 6 }}>
@@ -381,6 +384,7 @@ export default function ChatPage() {
   const [streamAgentReplies, setStreamAgentReplies] = useState<AgentReply[]>([]);
   const [streamReply, setStreamReply] = useState("");
   const [currentNode, setCurrentNode] = useState<string>("");
+  const [streamStepsOpen, setStreamStepsOpen] = useState(false);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
   const [workflowsLoading, setWorkflowsLoading] = useState(true);
@@ -456,6 +460,45 @@ export default function ChatPage() {
     }
   }, [auth?.currentUser]);
 
+  const loadSessionMessages = async (
+    sessionId: string,
+    conversations: ConversationSummary[]
+  ): Promise<Message[]> => {
+    const token = await auth?.currentUser?.getIdToken();
+    if (!token || conversations.length === 0) return [];
+
+    const ordered = [...conversations].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const transcripts = await Promise.all(
+      ordered.map(async (conv) => {
+        const res = await fetch(
+          `${API_URL}/learning/sessions/${sessionId}/conversations/${conv.execution_id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (!res.ok) {
+          return [] as Message[];
+        }
+
+        const data = (await res.json()) as {
+          messages?: { role?: string; text?: string }[];
+        };
+
+        return (data.messages ?? [])
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            text: String(m.text ?? ""),
+          }));
+      })
+    );
+
+    return transcripts.flat();
+  };
+
   const handleSelectSession = async (sessionId: string) => {
     const token = await auth?.currentUser?.getIdToken();
     if (!token) return;
@@ -466,10 +509,15 @@ export default function ChatPage() {
       });
       if (res.ok) {
         const data = (await res.json()) as { session: LearningSession };
+        const selected = sessionTree.find((s) => s.session.id === sessionId);
+        const restoredMessages = await loadSessionMessages(
+          sessionId,
+          selected?.conversations ?? []
+        );
         setActiveSession(data.session);
         setSelectedSessionId(sessionId);
         setViewingHistory(false);
-        setMessages([]);
+        setMessages(restoredMessages);
         await loadLearningData();
       }
     } catch (e) {
@@ -533,6 +581,7 @@ export default function ChatPage() {
     setStreamAgentReplies([]);
     setStreamReply("");
     setCurrentNode("");
+    setStreamStepsOpen(false);
     const historyTurns = buildLastTurns(messages, 6);
     
     try {
@@ -924,87 +973,104 @@ export default function ChatPage() {
                     border: "none",
                   }}
                 >
-                  <Typography
-                    variant="body2"
+                  <Box
                     sx={{
-                      fontWeight: 500,
-                      color: "#666666",
-                      fontSize: "0.9375rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                       mb: 2,
+                      cursor: "pointer",
                     }}
+                    onClick={() => setStreamStepsOpen((open) => !open)}
                   >
-                    Thinking ({streamSteps.length} step{streamSteps.length !== 1 ? "s" : ""})
-                  </Typography>
-                  {groupStepsForThinking(streamSteps).map((group) => (
-                    <Box key={group.key} sx={{ mb: 2 }}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{
-                          fontWeight: 600,
-                          color: "#555555",
-                          fontSize: "0.875rem",
-                          mb: 1,
-                        }}
-                      >
-                        {group.title}
-                      </Typography>
-                      {group.steps.map((step, j) => (
-                        <Box key={`${group.key}-${j}`} sx={{ mb: j < group.steps.length - 1 ? 2 : 0 }}>
-                          <Box
-                            sx={{
-                              bgcolor:
-                                step.tool === "Pipeline: agent run" ? "#E8F0FE" : "#F8F8F8",
-                              borderRadius: 1,
-                              px: 2,
-                              py: 1,
-                              mb: 1,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {step.agent_name ? (
-                              <Chip
-                                label={step.agent_name}
-                                size="small"
-                                sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600 }}
-                              />
-                            ) : null}
-                            <Typography variant="caption" sx={{ color: "#999999", fontWeight: 500 }}>
-                              {step.tool || "tool"}
-                            </Typography>
-                          </Box>
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              bgcolor: "white",
-                              border: "1px solid #E5E5E5",
-                              borderRadius: 1,
-                              px: 2,
-                              py: 1.5,
-                            }}
-                          >
-                            <Typography
-                              component="pre"
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontWeight: 500,
+                        color: "#666666",
+                        fontSize: "0.9375rem",
+                      }}
+                    >
+                      Thinking ({streamSteps.length} step{streamSteps.length !== 1 ? "s" : ""})
+                    </Typography>
+                    {streamStepsOpen ? (
+                      <ExpandLessIcon sx={{ color: "#666666" }} />
+                    ) : (
+                      <ExpandMoreIcon sx={{ color: "#666666" }} />
+                    )}
+                  </Box>
+                  <Collapse in={streamStepsOpen}>
+                    {groupStepsForThinking(streamSteps).map((group) => (
+                      <Box key={group.key} sx={{ mb: 2 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{
+                            fontWeight: 600,
+                            color: "#555555",
+                            fontSize: "0.875rem",
+                            mb: 1,
+                          }}
+                        >
+                          {group.title}
+                        </Typography>
+                        {group.steps.map((step, j) => (
+                          <Box key={`${group.key}-${j}`} sx={{ mb: j < group.steps.length - 1 ? 2 : 0 }}>
+                            <Box
                               sx={{
-                                whiteSpace: "pre-wrap",
-                                fontFamily: "monospace",
-                                fontSize: "0.8125rem",
-                                color: "#4A4A4A",
-                                lineHeight: 1.6,
-                                m: 0,
+                                bgcolor:
+                                  step.tool === "Pipeline: agent run" ? "#E8F0FE" : "#F8F8F8",
+                                borderRadius: 1,
+                                px: 2,
+                                py: 1,
+                                mb: 1,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                flexWrap: "wrap",
                               }}
                             >
-                              {step.log ? `REASONING:\n${step.log}\n\n` : ""}
-                              {step.tool_input ? `INPUT: ${step.tool_input}\n\n` : ""}
-                              {step.observation}
-                            </Typography>
-                          </Paper>
-                        </Box>
-                      ))}
-                    </Box>
-                  ))}
+                              {step.agent_name ? (
+                                <Chip
+                                  label={step.agent_name}
+                                  size="small"
+                                  sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600 }}
+                                />
+                              ) : null}
+                              <Typography variant="caption" sx={{ color: "#999999", fontWeight: 500 }}>
+                                {step.tool || "tool"}
+                              </Typography>
+                            </Box>
+                            <Paper
+                              elevation={0}
+                              sx={{
+                                bgcolor: "white",
+                                border: "1px solid #E5E5E5",
+                                borderRadius: 1,
+                                px: 2,
+                                py: 1.5,
+                              }}
+                            >
+                              <Typography
+                                component="pre"
+                                sx={{
+                                  whiteSpace: "pre-wrap",
+                                  fontFamily: "monospace",
+                                  fontSize: "0.8125rem",
+                                  color: "#4A4A4A",
+                                  lineHeight: 1.6,
+                                  m: 0,
+                                }}
+                              >
+                                {step.log ? `REASONING:\n${step.log}\n\n` : ""}
+                                {step.tool_input ? `INPUT: ${step.tool_input}\n\n` : ""}
+                                {step.observation}
+                              </Typography>
+                            </Paper>
+                          </Box>
+                        ))}
+                      </Box>
+                    ))}
+                  </Collapse>
                 </Paper>
               )}
 
