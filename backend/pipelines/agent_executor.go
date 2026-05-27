@@ -3,6 +3,7 @@ package pipelines
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"encore.app/backend/content"
@@ -115,6 +116,31 @@ func (e *AgentExecutor) execute(ctx context.Context, query string, stream Stream
 		chains.WithMaxTokens(e.config.MaxTokens),
 	)
 	if err != nil {
+		if recovered, ok := recoverAgentOutputFromParseError(err); ok {
+			rlog.Warn("agent parse fallback: using recovered plain-text output", "agent", e.config.Name)
+
+			if stream != nil {
+				stream.WriteEvent("reply", map[string]string{"content": recovered})
+			}
+			e.appendAgentReply(recovered)
+			e.addTraceStep(ExecutionStep{
+				StepType:  "agent_output",
+				Output:    recovered,
+				Timestamp: time.Now(),
+			})
+
+			duration := time.Since(startTime)
+			if stream != nil {
+				stream.WriteEvent("done", map[string]string{
+					"duration_ms": fmt.Sprintf("%d", duration.Milliseconds()),
+				})
+			}
+
+			return &AgentResult{
+				Answer:        recovered,
+				ToolCallCount: e.countToolCalls(),
+			}, nil
+		}
 		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
 
@@ -130,6 +156,25 @@ func (e *AgentExecutor) execute(ctx context.Context, query string, stream Stream
 		Answer:        result,
 		ToolCallCount: e.countToolCalls(),
 	}, nil
+}
+
+func recoverAgentOutputFromParseError(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+
+	const marker = "unable to parse agent output:"
+	msg := err.Error()
+	idx := strings.Index(msg, marker)
+	if idx == -1 {
+		return "", false
+	}
+
+	out := strings.TrimSpace(msg[idx+len(marker):])
+	if out == "" {
+		return "", false
+	}
+	return out, true
 }
 
 // createLLM creates an LLM instance based on config
